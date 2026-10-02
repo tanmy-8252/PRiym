@@ -1,0 +1,42 @@
+name: PRiym checks
+on: [push, pull_request]
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: priym
+          POSTGRES_PASSWORD: priym
+          POSTGRES_DB: priym_test
+        ports: ["5432:5432"]
+        options: --health-cmd="pg_isready -U priym -d priym_test" --health-interval=5s --health-timeout=5s --health-retries=10
+    env:
+      DATABASE_URL: postgresql://priym:priym@localhost:5432/priym_test
+      TEST_DATABASE_URL: postgresql://priym:priym@localhost:5432/priym_test
+      AUTH_SECRET: ci-auth-secret-with-at-least-32-characters
+      AUDIT_SECRET: ci-audit-secret-with-at-least-32-characters
+      AUTH_URL: http://localhost:3000
+      SEED_DEMO: "true"
+      NEXT_PUBLIC_DEMO_MODE: "true"
+      DEMO_PASSWORD: PriymDemo1!
+      CRON_SECRET: ci-cron-secret-with-at-least-32-characters
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: node --input-type=module -e 'import {authenticator} from "otplib"; import fs from "node:fs"; fs.appendFileSync(process.env.GITHUB_ENV, "DEMO_TOTP_SECRET="+authenticator.generateSecret()+"\n")'
+      - run: npm run db:generate
+      - run: npm run db:deploy
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run test:coverage
+      - run: npm run test:integration
+      - run: npm run db:seed
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+      - run: npm run build

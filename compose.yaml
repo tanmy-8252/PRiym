@@ -1,0 +1,16 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: priym
+      POSTGRES_PASSWORD: priym
+      POSTGRES_DB: priym
+    ports: ["127.0.0.1:54329:5432"]
+    volumes: ["priym-db:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U priym -d priym"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+volumes:
+  priym-db:

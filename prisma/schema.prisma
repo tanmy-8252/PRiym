@@ -1,0 +1,361 @@
+generator client {
+  provider = "prisma-client"
+  output = "../src/generated/prisma"
+}
+datasource db {
+  provider = "postgresql"
+}
+enum Role {
+  STUDENT
+  FACULTY
+  HOD
+  ADMIN
+}
+enum AccountStatus {
+  PENDING
+  ACTIVE
+  INACTIVE
+}
+enum SubmissionStatus {
+  DRAFT
+  SUBMITTED
+  UNDER_REVIEW
+  CLARIFICATION_REQUESTED
+  RESUBMITTED
+  APPROVED
+  REJECTED
+  EXPIRED
+}
+enum Level {
+  INTERNATIONAL
+  NATIONAL
+  STATE
+  UNIVERSITY
+  COLLEGE
+  DEPARTMENT
+}
+model Department {
+  id String @id @default(uuid())
+  name String
+  code String @unique
+  slaDays Int @default(5)
+  defaultVerifierId String?
+  users User[]
+  categories Category[]
+  submissions Submission[]
+}
+model User {
+  id String @id @default(uuid())
+  name String
+  email String @unique
+  usn String? @unique
+  batchYear Int?
+  passwordHash String
+  role Role @default(STUDENT)
+  status AccountStatus @default(PENDING)
+  emailVerified Boolean @default(false)
+  departmentId String
+  department Department @relation(fields: [departmentId], references: [id])
+  mentorId String?
+  mentor User? @relation("Mentees", fields: [mentorId], references: [id])
+  mentees User[] @relation("Mentees")
+  failedAttempts Int @default(0)
+  lockedUntil DateTime?
+  mfaSecret String?
+  lastTotpStep BigInt?
+  portfolioPublic Boolean @default(false)
+  leaderboardVisible Boolean @default(true)
+  bio String @default("")
+  phone String @default("")
+  linkedIn String @default("")
+  github String @default("")
+  officeHours String @default("")
+  expertise String @default("")
+  emailPreferences String[]
+  pendingMfaSecret String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  submissions Submission[] @relation("StudentSubmissions")
+  assigned Submission[] @relation("ReviewerSubmissions")
+  events VerificationEvent[]
+  evidence Evidence[]
+  ledger PointEntry[] @relation("StudentPoints")
+  awards PointEntry[] @relation("ActorPoints")
+  badges UserBadge[]
+  notifications Notification[]
+  sessions AuthSession[]
+  passwordHistory PasswordHistory[]
+  tokens AccountToken[]
+  recoveryCodes MfaRecoveryCode[]
+  savedFilters SavedFilter[]
+  reportJobs ReportJob[]
+  reportSchedules ReportSchedule[]
+  honorRoll HonorRoll[]
+  @@index([departmentId, role])
+}
+model AuthSession {
+  id String @id @default(uuid())
+  userId String
+  user User @relation(fields:[userId], references:[id])
+  expiresAt DateTime
+  lastSeenAt DateTime @default(now())
+  revokedAt DateTime?
+  createdAt DateTime @default(now())
+  userAgent String @default("")
+  ipAddress String @default("")
+  @@index([userId])
+}
+model PasswordHistory {
+  id String @id @default(uuid())
+  userId String
+  user User @relation(fields:[userId], references:[id])
+  hash String
+  createdAt DateTime @default(now())
+}
+model Semester {
+  id String @id @default(uuid())
+  label String
+  startDate DateTime @db.Date
+  endDate DateTime @db.Date
+  active Boolean @default(false)
+  academicYear String @default("")
+  closedAt DateTime?
+  honorRoll HonorRoll[]
+  submissions Submission[]
+  ledger PointEntry[]
+}
+model Category {
+  id String @id @default(uuid())
+  name String @unique
+  description String
+  basePoints Int
+  multiplier Decimal @default(1) @db.Decimal(4,2)
+  departmentId String?
+  department Department? @relation(fields:[departmentId], references:[id])
+  verifierId String?
+  checklist String[]
+  active Boolean @default(true)
+  requiresPosition Boolean @default(false)
+  subcategories String[]
+  programOutcomes String[]
+  naacIndicator String @default("")
+  rejectionCodes String[]
+  createdAt DateTime @default(now())
+  submissions Submission[]
+}
+model Submission {
+  id String @id @default(uuid())
+  title String @db.VarChar(150)
+  description String @db.VarChar(1000)
+  organization String @db.VarChar(200)
+  achievementDate DateTime @db.Date
+  level Level
+  position String?
+  externalUrl String?
+  subcategory String?
+  collaboratorIds String[]
+  status SubmissionStatus @default(DRAFT)
+  studentId String
+  student User @relation("StudentSubmissions", fields:[studentId], references:[id])
+  reviewerId String?
+  reviewer User? @relation("ReviewerSubmissions", fields:[reviewerId], references:[id])
+  departmentId String
+  department Department @relation(fields:[departmentId], references:[id])
+  categoryId String
+  category Category @relation(fields:[categoryId], references:[id])
+  semesterId String
+  semester Semester @relation(fields:[semesterId], references:[id])
+  pointsAwarded Int @default(0)
+  pointSnapshot Json?
+  checklistSnapshot String[]
+  resubmissionCount Int @default(0)
+  escalated Boolean @default(false)
+  escalationReason String?
+  escalatedAt DateTime?
+  submittedAt DateTime?
+  reviewedAt DateTime?
+  clarificationAt DateTime?
+  slaDeadline DateTime?
+  version Int @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  evidence Evidence[]
+  events VerificationEvent[]
+  ledger PointEntry[]
+  @@index([studentId, status])
+  @@index([departmentId, status, submittedAt])
+  @@index([reviewerId, escalated, status])
+}
+model Evidence {
+  id String @id @default(uuid())
+  ownerId String
+  owner User @relation(fields:[ownerId], references:[id])
+  submissionId String?
+  submission Submission? @relation(fields:[submissionId], references:[id])
+  fileName String
+  mimeType String
+  sizeBytes Int
+  storageKey String @unique
+  sha256 String
+  scanStatus String
+  createdAt DateTime @default(now())
+  @@index([ownerId, submissionId])
+}
+model VerificationEvent {
+  id String @id @default(uuid())
+  submissionId String
+  submission Submission @relation(fields:[submissionId], references:[id])
+  actorId String
+  actor User @relation(fields:[actorId], references:[id])
+  action String
+  comment String?
+  reasonCode String?
+  checklist String[]
+  createdAt DateTime @default(now())
+}
+model PointEntry {
+  id String @id @default(uuid())
+  userId String
+  user User @relation("StudentPoints", fields:[userId], references:[id])
+  actorId String
+  actor User @relation("ActorPoints", fields:[actorId], references:[id])
+  semesterId String
+  semester Semester @relation(fields:[semesterId], references:[id])
+  submissionId String? @unique
+  submission Submission? @relation(fields:[submissionId], references:[id])
+  amount Int
+  type String @default("EARNED")
+  note String
+  createdAt DateTime @default(now())
+  @@index([userId, semesterId])
+}
+model Badge {
+  id String @id @default(uuid())
+  name String @unique
+  description String
+  threshold Int
+  active Boolean @default(true)
+  ruleType String @default("MILESTONE")
+  categoryId String?
+  users UserBadge[]
+}
+model UserBadge {
+  id String @id @default(uuid())
+  userId String
+  user User @relation(fields:[userId], references:[id])
+  badgeId String
+  badge Badge @relation(fields:[badgeId], references:[id])
+  earnedAt DateTime @default(now())
+  revokedAt DateTime?
+  @@unique([userId, badgeId])
+}
+model Notification {
+  id String @id @default(uuid())
+  userId String
+  user User @relation(fields:[userId], references:[id])
+  title String
+  body String
+  link String?
+  readAt DateTime?
+  dedupKey String? @unique
+  emailedAt DateTime?
+  createdAt DateTime @default(now())
+  @@index([userId, readAt])
+}
+model AuditLog {
+  id String @id @default(uuid())
+  actorId String?
+  actorRole String
+  departmentId String?
+  action String
+  entityType String
+  entityId String?
+  metadata Json
+  signature String
+  createdAt DateTime @default(now())
+  ipAddress String @default("")
+  userAgent String @default("")
+  @@index([createdAt])
+}
+model AccountToken {
+  id String @id @default(uuid())
+  userId String
+  user User @relation(fields:[userId], references:[id])
+  purpose String
+  digest String @unique
+  expiresAt DateTime
+  usedAt DateTime?
+  createdAt DateTime @default(now())
+  @@index([userId, purpose, createdAt])
+}
+model MfaRecoveryCode {
+  id String @id @default(uuid())
+  userId String
+  user User @relation(fields:[userId], references:[id])
+  digest String @unique
+  usedAt DateTime?
+}
+model MailOutbox {
+  id String @id @default(uuid())
+  recipient String
+  subject String
+  body String
+  status String @default("PENDING")
+  attempts Int @default(0)
+  nextAttemptAt DateTime @default(now())
+  sentAt DateTime?
+  lastError String?
+  dedupKey String? @unique
+  createdAt DateTime @default(now())
+}
+model ConflictOfInterest {
+  id String @id @default(uuid())
+  facultyId String
+  studentId String
+  reason String
+  createdAt DateTime @default(now())
+  @@unique([facultyId, studentId])
+}
+model SavedFilter {
+  id String @id @default(uuid())
+  userId String
+  user User @relation(fields:[userId], references:[id])
+  label String
+  query String
+  @@unique([userId, label])
+}
+model ReportJob {
+  id String @id @default(uuid())
+  userId String
+  user User @relation(fields:[userId], references:[id])
+  query String
+  scopeDepartmentId String @default("")
+  ownerRole String @default("")
+  status String @default("PENDING")
+  storageKey String?
+  error String?
+  createdAt DateTime @default(now())
+  expiresAt DateTime?
+}
+model ReportSchedule {
+  id String @id @default(uuid())
+  userId String
+  user User @relation(fields:[userId], references:[id])
+  query String
+  frequency String
+  recipients String[]
+  nextRunAt DateTime
+  active Boolean @default(true)
+}
+model HonorRoll {
+  id String @id @default(uuid())
+  userId String
+  user User @relation(fields:[userId], references:[id])
+  semesterId String
+  semester Semester @relation(fields:[semesterId], references:[id])
+  departmentId String
+  rank Int
+  points Int
+  createdAt DateTime @default(now())
+  @@unique([userId, semesterId])
+}
