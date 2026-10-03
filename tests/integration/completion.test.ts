@@ -1,4 +1,12 @@
-import { beforeAll, afterAll, describe, it, expect } from "vitest";
+import {
+  beforeAll,
+  afterAll,
+  afterEach,
+  describe,
+  it,
+  expect,
+  vi,
+} from "vitest";
 import { randomUUID } from "node:crypto";
 import { hash } from "bcryptjs";
 import { authenticator } from "otplib";
@@ -25,6 +33,7 @@ import {
 } from "@/server/report-jobs";
 import { deliverMail, queueMail } from "@/server/mail";
 import type { User } from "@/generated/prisma/client";
+import { encrypt } from "@/lib/crypto";
 let admin: User,
   student: User,
   faculty: User,
@@ -105,6 +114,7 @@ beforeAll(async () => {
   semesterId = semester.id;
 });
 afterAll(async () => db.$disconnect());
+afterEach(() => vi.unstubAllEnvs());
 async function token(userId: string, purpose: string) {
   const m = await db.mailOutbox.findFirst({
     where: {
@@ -143,15 +153,41 @@ async function submit() {
 }
 describe("completed account and administration paths", () => {
   it("requires email verification before approval and consumes links once", async () => {
-    const email = `registered-${suffix}@atria.edu`;
-    await register({
-      name: "Registered Student",
-      email,
-      password,
-      departmentId,
-      role: "STUDENT",
-      usn: `1AT26CS${Math.floor(Math.random() * 900 + 100)}`,
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("AUTH_URL", "https://priym.example.com");
+    vi.stubEnv("EMAIL_PROVIDER", "smtp");
+    vi.stubEnv("EMAIL_FROM", "synthetic@gmail.com");
+    vi.stubEnv("SMTP_HOST", "smtp.gmail.com");
+    vi.stubEnv("SMTP_PORT", "465");
+    vi.stubEnv("SMTP_USER", "synthetic@gmail.com");
+    vi.stubEnv("SMTP_PASSWORD", "synthetic-only-no-external-email");
+    await db.user.update({
+      where: { id: admin.id },
+      data: {
+        mfaSecret: encrypt(authenticator.generateSecret()),
+      },
     });
+    const email = `registered-${suffix}@atria.edu`;
+    const scheduleMail = vi.fn();
+    await register(
+      {
+        name: "Registered Student",
+        email,
+        password,
+        departmentId,
+        role: "STUDENT",
+        usn: `1AT26CS${Math.floor(Math.random() * 900 + 100)}`,
+      },
+      scheduleMail,
+    );
+    const mail = await db.mailOutbox.findFirstOrThrow({
+      where: { recipient: email },
+    });
+    expect(scheduleMail).toHaveBeenCalledExactlyOnceWith([mail.id]);
+    expect(mail.body).toContain(
+      "https://priym.example.com/account?mode=verify",
+    );
+    // Callback is scheduled only after the account and mail transaction commits.
     const user = await db.user.findUniqueOrThrow({ where: { email } });
     expect(user.status).toBe("PENDING");
     expect(await authenticate({ email, password })).toBeNull();
@@ -165,6 +201,28 @@ describe("completed account and administration paths", () => {
     ).rejects.toMatchObject({ code: "INVALID_TOKEN" });
     await updateUser(admin, user.id, { status: "ACTIVE" });
     expect(await authenticate({ email, password })).not.toBeNull();
+  });
+  it("does not create accounts or schedule emails with incomplete production setup", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("EMAIL_PROVIDER", "file");
+    const email = `blocked-${suffix}@atria.edu`;
+    const scheduleMail = vi.fn();
+    await expect(
+      register(
+        {
+          name: "Blocked Student",
+          email,
+          password,
+          departmentId,
+          role: "STUDENT",
+          usn: "1AT26CS999",
+        },
+        scheduleMail,
+      ),
+    ).rejects.toMatchObject({ code: "REGISTRATION_UNAVAILABLE" });
+    expect(await db.user.findUnique({ where: { email } })).toBeNull();
+    expect(await db.mailOutbox.count({ where: { recipient: email } })).toBe(0);
+    expect(scheduleMail).not.toHaveBeenCalled();
   });
   it("reset tokens reject reuse and revoke sessions", async () => {
     const session = await authenticate({ email: student.email, password });
@@ -370,5 +428,30 @@ describe("completed account and administration paths", () => {
         where: { dedupKey: `test:${suffix}`, status: "SENT" },
       }),
     ).toBe(1);
+  });
+  it("targets only the committed account emails and prevents duplicate delivery", async () => {
+    const [target, unrelated] = await db.$transaction(async (tx) => [
+      await queueMail(tx, student.email, "Targeted email", "Synthetic message"),
+      await queueMail(
+        tx,
+        student.email,
+        "Unrelated queued email",
+        "Synthetic message",
+      ),
+    ]);
+    expect(await deliverMail([])).toEqual({ sent: 0, failed: 0 });
+    const results = await Promise.all([
+      deliverMail([target.id]),
+      deliverMail([target.id]),
+    ]);
+    expect(results.reduce((n, r) => n + r.sent, 0)).toBe(1);
+    expect(
+      (await db.mailOutbox.findUniqueOrThrow({ where: { id: target.id } }))
+        .status,
+    ).toBe("SENT");
+    expect(
+      (await db.mailOutbox.findUniqueOrThrow({ where: { id: unrelated.id } }))
+        .status,
+    ).toBe("PENDING");
   });
 });

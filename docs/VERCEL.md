@@ -3,7 +3,8 @@
 Import `tanmy-8252/PRiym` into Vercel. Use the repository root (`./`), Next.js,
 Node.js 24.x, and the `main` branch for Production. `vercel.json` sets installation
 to `npm ci` and the build to `npm run vercel-build`. That command regenerates the
-Prisma client, applies committed migrations, then builds Next.js. A failed
+Prisma client, applies committed migrations, optionally provisions the first Admin
+when explicitly enabled, then builds Next.js. A failed
 migration stops the deployment. Subsequent pushes to `main` deploy automatically.
 
 ## Database and environment
@@ -29,34 +30,19 @@ Set production database credentials and secrets for **Production only**. Preview
 deployments need their own database and secrets; do not let branch builds migrate
 or access the production database. Redeploy after changing environment variables.
 
-## First production administrator
+## First production administrator and email
 
 The production database starts empty; local demo accounts are deliberately absent.
-Provision the first administrator from a trusted machine after migrations. In a
-fresh clone, install dependencies:
+Follow [REGISTRATION-SETUP.md](REGISTRATION-SETUP.md) for Gmail email delivery,
+private authenticator enrollment and one-time Admin/CSE provisioning through
+Vercel. That method uses the existing production encryption and audit secrets.
+Remove all `BOOTSTRAP_ADMIN_*` settings after success, then redeploy. No public
+endpoint can provision an Admin or bypass email verification/approval.
 
-```sh
-npm ci
-```
-
-Set `NODE_ENV=production`, the hosted `DATABASE_URL`, `AUTH_SECRET`, `AUDIT_SECRET`,
-and `AUTH_URL` in a private operator environment. Also set
-`BOOTSTRAP_ADMIN_EMAIL`, `BOOTSTRAP_ADMIN_NAME`, `BOOTSTRAP_ADMIN_PASSWORD`
-(a strong unique password) and `BOOTSTRAP_ADMIN_MFA_SECRET` (base32). Enroll that
-MFA secret in the administrator's authenticator securely; it uses SHA-1,
-six digits and a 30-second period. Then run:
-
-```sh
-npm run db:generate
-npm run db:deploy
-npm run bootstrap:admin
-```
-
-The bootstrap command refuses to create another Admin if one already exists.
-Remove the bootstrap variables afterward. Sign in at `/login` with that individual
-administrator account and its current authenticator code. Configure departments,
-semesters, categories and point rules in the administrator dashboard. Registration
-and password reset require verified email service configuration and maintenance.
+The same guide includes a trusted-machine alternative with an isolated private
+`.env.operator`, `npm run production:bootstrap`, and a read-only
+`npm run production:check`. Never substitute local demo secrets for production
+secrets or run the demo seed on a hosted database.
 
 ## Verify the deployment
 
@@ -76,13 +62,14 @@ and a verified finalize step are needed. Keep the scanner requirement intact.
 Queued reports currently need persistent file storage, which Vercel's local file
 system does not provide. Small synchronous reports do not use that queue.
 
-Set `EMAIL_PROVIDER=resend`, a verified `EMAIL_FROM` and `RESEND_API_KEY` for email.
-A separate scheduler must invoke `GET /api/maintenance` every minute with
-`Authorization: Bearer <CRON_SECRET>` to deliver queued email and run maintenance.
-Vercel Hobby cron only supports a daily schedule, so this repository does not
-install an incompatible minute schedule. A separate Node worker can run
-`npm run worker` with the same environment. See [DEPLOYMENT.md](DEPLOYMENT.md) for
-the Docker option that includes ClamAV and persistent runtime storage.
+Email supports Gmail SMTP or Resend; see the registration guide for exact
+variables. Account emails are attempted immediately after the API response.
+The included Vercel cron invokes the secured `/api/mail/maintenance` endpoint
+at 06:00 UTC daily to retry due messages; this is compatible with Hobby.
+For more frequent retries, use a separate authorized scheduler or Node worker.
+Do not use the broader `/api/maintenance` job on Vercel until queued reports
+have persistent storage. On a persistent Node/Docker host, `npm run worker`
+can process email, reminders and reports with the complete environment.
 
 References: [Vercel GitHub integration](https://vercel.com/docs/git/vercel-for-github),
 [Prisma on Vercel](https://www.prisma.io/docs/orm/v7/prisma-client/deployment/serverless/deploy-to-vercel),

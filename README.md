@@ -87,6 +87,7 @@ npm run db:seed                      # repeatable local demo reset + sample data
 npm run demo:reset                   # generate, migrate, repair local demo accounts
 npm run demo:otp                     # fresh DB-backed HOD/Admin codes
 npm run test:login                   # all four live Auth.js role logins at 127.0.0.1
+npm run test:account                 # local HTTP signup, verification, approval and login
 npm run db:embedded                  # start embedded database
 npm run db:embedded:stop
 npm run db:stop                      # stop native database
@@ -128,7 +129,11 @@ Auth.js sessions reference database records and every protected request rereads 
 
 Students and Faculty can register at `/account?mode=register`. They must verify the emailed link and receive Admin approval. HOD/Admin accounts use controlled provisioning. Verification links expire in 24 hours, reset links in 1 hour; both are single-use. For local development, emails are written under `.data/mail` by the worker. `npm run mail:inbox -- user@atria.edu` displays that user's development messages. No real email is sent with the default configuration.
 
-Production email uses `EMAIL_PROVIDER=resend`, a verified `EMAIL_FROM` and `RESEND_API_KEY`. Keep these in the host's private environment. Security emails bypass notification preferences. Failed delivery retries with backoff and records a failure after five attempts.
+Production email supports Gmail SMTP (`EMAIL_PROVIDER=smtp`) or Resend. For Gmail, set `SMTP_HOST=smtp.gmail.com`, `SMTP_PORT=465`, `SMTP_USER`, `SMTP_PASSWORD` (a Google app password), and `EMAIL_FROM` equal to `SMTP_USER`. For Resend, use a verified bare `EMAIL_FROM` address and `RESEND_API_KEY`. Keep credentials in the host's private environment. Registration, verification-link requests and password reset confirmations attempt delivery after the response using Next.js `after`; messages stay in the durable outbox for retries. Security emails bypass notification preferences. Failed delivery retries with backoff and records a failure after five attempts. SMTP delivery can be duplicated if the provider accepts a message but the database commit fails; the stable Message-ID helps identify duplicates.
+
+Production registration opens only after a department, an active verified Admin with MFA, a valid HTTPS `AUTH_URL` and production email settings exist. Production Vercel deployment page URLs redirect to `AUTH_URL`; API origin checks remain exact. Use the primary domain when sharing links.
+
+For the first production Admin and CSE, follow [the registration setup guide](docs/REGISTRATION-SETUP.md). A one-time Vercel deployment can provision the account using private `BOOTSTRAP_ADMIN_*` settings and the existing production encryption/audit secrets. `npm run mfa:enroll` helps you privately enroll and confirm an authenticator. The bootstrap never replaces existing passwords or MFA and has no public API. Alternatively, a trusted operator can use an isolated `.env.operator` and `npm run production:bootstrap`; `npm run production:check` checks database and SMTP authentication without sending email. Do not use the local demo seed for this.
 
 Reports over 500 records are queued and appear under Reports after the worker runs. Download links require authorized accounts and expire after 24 hours. HOD/Admin can schedule reports. Institution controls configure NAAC indicators and program outcomes by category; exports mark unconfigured records `UNMAPPED`. Reports are not institution-certified merely because a file is generated.
 
@@ -153,4 +158,5 @@ npm run worker
 The demo seed requires `SEED_DEMO=true`, `DEMO_PASSWORD` and `DEMO_TOTP_SECRET`; it refuses production execution. SQL migrations are committed under `prisma/migrations`. `db:deploy` applies existing migrations; `db:migrate -- --name change` creates future migrations against standard PostgreSQL. Production runtime: `npm run build`, then `npm start` (see deployment notes for database release steps, storage and scheduling).
 
 See [`Deployment`](docs/DEPLOYMENT.md) for Docker, migrations, private storage and maintenance, and [`Vercel through GitHub`](docs/VERCEL.md) for hosted PostgreSQL, production variables and the first administrator. See `docs/STATUS.md` for the delivered scope, optional extensions and target-environment acceptance work.
+
 # PRiym

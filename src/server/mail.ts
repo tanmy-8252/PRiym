@@ -2,6 +2,8 @@ import { db } from "@/lib/db";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { Prisma } from "@/generated/prisma/client";
+import { mailConfiguration } from "@/lib/mail-config";
+import { sendSmtp } from "./smtp";
 export function queueMail(
   tx: Prisma.TransactionClient,
   recipient: string,
@@ -14,24 +16,37 @@ export function queueMail(
     ? tx.mailOutbox.upsert({ where: { dedupKey }, create: data, update: {} })
     : tx.mailOutbox.create({ data });
 }
-export async function deliverMail() {
+export async function deliverMail(messageIds?: readonly string[]) {
   let sent = 0,
     failed = 0;
-  await db.$transaction(
-    async (tx) => {
-      const locks = await tx.$queryRaw<
-        { locked: boolean }[]
-      >`SELECT pg_try_advisory_xact_lock(913824) AS locked`;
-      if (!locks[0]?.locked) return;
-      const messages = await tx.mailOutbox.findMany({
-        where: { status: "PENDING", nextAttemptAt: { lte: new Date() } },
-        orderBy: { createdAt: "asc" },
-        take: 20,
-      });
-      for (const m of messages) {
+  if (messageIds && !messageIds.length) return { sent, failed };
+  const config = mailConfiguration();
+  const messages = await db.mailOutbox.findMany({
+    where: {
+      status: "PENDING",
+      nextAttemptAt: { lte: new Date() },
+      ...(messageIds ? { id: { in: [...messageIds] } } : {}),
+    },
+    orderBy: { createdAt: "asc" },
+    take: config?.provider === "smtp" ? 5 : 20,
+  });
+  for (const pending of messages)
+    await db.$transaction(
+      async (tx) => {
+        // Lock each message independently so a busy worker cannot skip a new
+        // verification email. A second invocation rechecks status after locking.
+        const locks = await tx.$queryRaw<
+          { locked: boolean }[]
+        >`SELECT pg_try_advisory_xact_lock(hashtext(${`mail:${pending.id}`})) AS locked`;
+        if (!locks[0]?.locked) return;
+        const m = await tx.mailOutbox.findUnique({
+          where: { id: pending.id },
+        });
+        if (!m || m.status !== "PENDING" || m.nextAttemptAt > new Date())
+          return;
         try {
-          const provider = process.env.EMAIL_PROVIDER || "file";
-          if (provider === "file" && process.env.NODE_ENV !== "production") {
+          if (!config) throw new Error("Email provider is not configured");
+          if (config.provider === "file") {
             const dir = path.resolve(
               /* turbopackIgnore: true */ process.cwd(),
               process.env.MAIL_DIR || ".data/mail",
@@ -46,22 +61,18 @@ export async function deliverMail() {
               ),
               { mode: 0o600 },
             );
+          } else if (config.provider === "smtp") {
+            await sendSmtp(config, m);
           } else {
-            if (
-              provider !== "resend" ||
-              !process.env.RESEND_API_KEY ||
-              !process.env.EMAIL_FROM
-            )
-              throw new Error("Email provider is not configured");
             const response = await fetch("https://api.resend.com/emails", {
               method: "POST",
               headers: {
-                Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+                Authorization: `Bearer ${config.apiKey}`,
                 "Content-Type": "application/json",
                 "Idempotency-Key": m.id,
               },
               body: JSON.stringify({
-                from: process.env.EMAIL_FROM,
+                from: config.from,
                 to: [m.recipient],
                 subject: m.subject,
                 text: m.body,
@@ -95,10 +106,9 @@ export async function deliverMail() {
           });
           failed++;
         }
-      }
-    },
-    { timeout: 120000 },
-  );
+      },
+      { timeout: 20000 },
+    );
   return { sent, failed };
 }
 export async function queueNotificationEmail() {

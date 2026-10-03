@@ -11,7 +11,7 @@ src/generated/
 *.tsbuildinfo
 *.log
 
-.next-check/
+.next*/
 .DS_Store
 .vercel/
 .cache/

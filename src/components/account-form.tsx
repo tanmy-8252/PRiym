@@ -77,7 +77,7 @@ export function AccountForm({
           </div>
           <div className="field">
             <label htmlFor="departmentId">Department</label>
-            <select id="departmentId" name="departmentId">
+            <select id="departmentId" name="departmentId" required>
               {departments.map((d) => (
                 <option key={d.id} value={d.id}>
                   {d.name}

@@ -7,7 +7,11 @@ export const passwordSchema = z
   .regex(/[a-z]/)
   .regex(/[A-Z]/)
   .regex(/[0-9]/)
-  .regex(/[^a-zA-Z0-9]/);
+  .regex(/[^a-zA-Z0-9]/)
+  .refine(
+    (p) => new TextEncoder().encode(p).length <= 72,
+    "Use a shorter password.",
+  );
 export const submissionSchema = z
   .object({
     title: z

@@ -13,6 +13,33 @@ function temporary(run: (dir: string) => void) {
   }
 }
 describe("CLI environment and local secret creation", () => {
+  it("does not load demo .env values into an isolated production operator command", () =>
+    temporary((dir) => {
+      writeFileSync(
+        join(dir, ".env"),
+        'DATABASE_URL="postgresql://p:p@127.0.0.1:54329/demo"\nSMTP_PASSWORD="synthetic-local-only"\n',
+      );
+      const env: NodeJS.ProcessEnv = {
+        ...process.env,
+        NODE_ENV: "production",
+        PRIYM_ENV_ISOLATED: "true",
+      };
+      delete env.DATABASE_URL;
+      delete env.SMTP_PASSWORD;
+      const script = `import ${JSON.stringify(pathToFileURL(resolve("src/lib/env.ts")).href)}; console.log(JSON.stringify({db:process.env.DATABASE_URL??null,smtp:process.env.SMTP_PASSWORD??null}));`;
+      const out = execFileSync(
+        process.execPath,
+        [
+          "--import",
+          resolve("node_modules/tsx/dist/loader.mjs"),
+          "--input-type=module",
+          "-e",
+          script,
+        ],
+        { cwd: dir, env, encoding: "utf8" },
+      );
+      expect(JSON.parse(out)).toEqual({ db: null, smtp: null });
+    }));
   it("loads the same mode-specific local overrides as Next.js", () =>
     temporary((dir) => {
       writeFileSync(

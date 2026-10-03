@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import { Logo } from "@/components/ui";
 import { AccountForm } from "@/components/account-form";
+import { registrationAvailable } from "@/server/registration-setup";
 export const dynamic = "force-dynamic";
 export default async function Account({
   searchParams,
@@ -18,6 +19,7 @@ export default async function Account({
           orderBy: { name: "asc" },
         })
       : [];
+  const available = mode !== "register" || (await registrationAvailable());
   return (
     <main style={{ maxWidth: 540, margin: "40px auto", padding: 24 }}>
       <Logo />
@@ -33,7 +35,17 @@ export default async function Account({
           Use your institutional account. Email verification and approval
           protect your department’s records.
         </p>
-        <AccountForm mode={mode} token={q.token} departments={departments} />
+        {available ? (
+          <AccountForm mode={mode} token={q.token} departments={departments} />
+        ) : (
+          <>
+            <p className="notice" role="status">
+              Registration will open once institution setup is complete. Please
+              contact your administrator.
+            </p>
+            <a href="/login">Back to sign in</a>
+          </>
+        )}
       </section>
     </main>
   );

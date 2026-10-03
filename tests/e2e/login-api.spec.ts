@@ -3,6 +3,8 @@ import { execFileSync } from "node:child_process";
 import { demoAccounts } from "../../src/lib/demo";
 const baseURL = process.env.E2E_BASE_URL || "http://127.0.0.1:3000";
 const password = process.env.DEMO_PASSWORD!;
+const differentPort = new URL(baseURL);
+differentPort.port = String(Number(differentPort.port || 80) + 1);
 const paths = {
   STUDENT: "/profile",
   FACULTY: "/submissions",
@@ -111,7 +113,7 @@ for (const account of demoAccounts) {
       expect(
         (
           await client.patch("/api/v1/profile", {
-            headers: { Origin: "http://127.0.0.1:3001" },
+            headers: { Origin: differentPort.origin },
             data: { bio: "", portfolioPublic: false, leaderboardVisible: true },
           })
         ).status(),

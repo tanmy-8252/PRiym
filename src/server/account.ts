@@ -9,6 +9,9 @@ import type { Prisma, User } from "@/generated/prisma/client";
 import { audit } from "./audit";
 import { queueMail } from "./mail";
 import { z } from "zod";
+import { registrationAvailable } from "./registration-setup";
+import { mailConfiguration } from "@/lib/mail-config";
+type ScheduleMail = (messageIds: string[]) => void;
 export const tokenDigest = (token: string) =>
   createHash("sha256").update(token).digest("hex");
 export async function issueToken(
@@ -32,7 +35,7 @@ export async function issueToken(
     },
   });
   const url = `${process.env.AUTH_URL || "http://localhost:3000"}/account?mode=${purpose.toLowerCase()}&token=${raw}`;
-  await queueMail(
+  return queueMail(
     tx,
     user.email,
     purpose === "VERIFY"
@@ -41,7 +44,7 @@ export async function issueToken(
     `Hello ${user.name},\n\n${purpose === "VERIFY" ? "Verify your institutional email" : "Choose a new password"} using this single-use link:\n${url}\n\nExpires in ${purpose === "VERIFY" ? "24 hours" : "1 hour"}. If you did not request this, ignore this message.`,
   );
 }
-export async function register(raw: unknown) {
+export async function register(raw: unknown, scheduleMail?: ScheduleMail) {
   const d = userSchema.parse(raw);
   assert(
     ["STUDENT", "FACULTY"].includes(d.role),
@@ -58,7 +61,14 @@ export async function register(raw: unknown) {
     "DOMAIN",
     "Use an approved institutional email.",
   );
-  return db.$transaction(async (tx) => {
+  assert(
+    await registrationAvailable(),
+    503,
+    "REGISTRATION_UNAVAILABLE",
+    "Registration will open once institution setup is complete. Please contact your administrator.",
+  );
+  const messageIds: string[] = [];
+  const result = await db.$transaction(async (tx) => {
     assert(
       await tx.department.findUnique({ where: { id: d.departmentId } }),
       422,
@@ -76,22 +86,33 @@ export async function register(raw: unknown) {
         passwordHash: await hash(d.password, 12),
       },
     });
-    await issueToken(tx, user, "VERIFY");
+    messageIds.push((await issueToken(tx, user, "VERIFY")).id);
     await audit(tx, user, "REGISTERED", "User", user.id);
     return {
       message:
         "Check your email to verify your address. An administrator must then approve your account before you can sign in.",
     };
   });
+  scheduleMail?.(messageIds);
+  return result;
 }
-export async function requestAccountLink(raw: unknown) {
+export async function requestAccountLink(
+  raw: unknown,
+  scheduleMail?: ScheduleMail,
+) {
   const d = z
     .object({
       email: z.email().toLowerCase(),
       purpose: z.enum(["VERIFY", "RESET"]),
     })
     .parse(raw);
-  await db.$transaction(async (tx) => {
+  assert(
+    mailConfiguration(),
+    503,
+    "EMAIL_UNAVAILABLE",
+    "Email delivery is temporarily unavailable. Please contact your administrator.",
+  );
+  const messageId = await db.$transaction(async (tx) => {
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${d.email}))`;
     const u = await tx.user.findUnique({ where: { email: d.email } });
     if (
@@ -107,14 +128,18 @@ export async function requestAccountLink(raw: unknown) {
         createdAt: { gt: new Date(Date.now() - 60_000) },
       },
     });
-    if (!recent) await issueToken(tx, u, d.purpose);
+    if (!recent) return (await issueToken(tx, u, d.purpose)).id;
   });
+  scheduleMail?.(messageId ? [messageId] : []);
   return {
     message:
       "If an eligible account exists, an email has been queued. Check your inbox.",
   };
 }
-export async function consumeAccountToken(raw: unknown) {
+export async function consumeAccountToken(
+  raw: unknown,
+  scheduleMail?: ScheduleMail,
+) {
   const d = z
     .object({
       token: z.string().regex(/^[a-f0-9]{64}$/),
@@ -122,7 +147,8 @@ export async function consumeAccountToken(raw: unknown) {
       password: z.string().optional(),
     })
     .parse(raw);
-  return db.$transaction(
+  const messageIds: string[] = [];
+  const result = await db.$transaction(
     async (tx) => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${d.token}))`;
       const t = await tx.accountToken.findUnique({
@@ -168,12 +194,13 @@ export async function consumeAccountToken(raw: unknown) {
           where: { userId: t.userId, purpose: "RESET", usedAt: null },
           data: { usedAt: new Date() },
         });
-        await queueMail(
+        const mail = await queueMail(
           tx,
           t.user.email,
           "Your PRiym password was changed",
           "Your password was reset and all active sessions were signed out. Contact your administrator if you did not do this.",
         );
+        messageIds.push(mail.id);
       } else
         await tx.user.update({
           where: { id: t.userId },
@@ -199,6 +226,8 @@ export async function consumeAccountToken(raw: unknown) {
     },
     { timeout: 15000 },
   );
+  scheduleMail?.(messageIds);
+  return result;
 }
 export async function manageMfa(u: User, raw: unknown) {
   const d = z
