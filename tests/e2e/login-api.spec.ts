@@ -1,5 +1,5 @@
 import { test, expect, type APIRequestContext } from "@playwright/test";
-import { execFileSync } from "node:child_process";
+import { demoOtp } from "./demo-otp";
 import { demoAccounts } from "../../src/lib/demo";
 const baseURL = process.env.E2E_BASE_URL || "http://127.0.0.1:3000";
 const password = process.env.DEMO_PASSWORD!;
@@ -31,26 +31,6 @@ async function login(
   expect(response.status()).toBe(200);
   return response.json();
 }
-function code(role: string) {
-  // Run the exact documented CLI, which reads the encrypted account secret from DB.
-  const result = JSON.parse(
-    execFileSync(
-      process.execPath,
-      [
-        "node_modules/tsx/dist/cli.mjs",
-        "scripts/demo-otp.ts",
-        "--role",
-        role,
-        "--json",
-      ],
-      { encoding: "utf8", timeout: 40000 },
-    ),
-  );
-  expect(result.codes[0].role).toBe(role);
-  expect(result.codes[0].email).toBe(`${role.toLowerCase()}@atria.edu`);
-  expect(result.validForSeconds).toBeGreaterThanOrEqual(14);
-  return result.codes[0].code;
-}
 for (const account of demoAccounts) {
   test(`${account.label}: real Auth.js cookie, role dashboard, RBAC and local actions`, async ({
     playwright,
@@ -66,7 +46,7 @@ for (const account of demoAccounts) {
         expect(html).toContain(`>${a.label}</button>`);
       expect(html).toContain(password);
       const otp = ["HOD", "ADMIN"].includes(account.role)
-        ? code(account.role)
+        ? demoOtp(account.role)
         : "";
       const result = await login(client, account.email, password, otp);
       expect(result.error).toBeUndefined();

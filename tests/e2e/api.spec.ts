@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { test, expect, APIRequestContext } from "@playwright/test";
-import { authenticator } from "otplib";
+import { demoOtp } from "./demo-otp";
 import { PDFDocument } from "pdf-lib";
 async function signIn(request: APIRequestContext, role: string) {
   const csrf = await (await request.get("/api/auth/csrf")).json();
@@ -9,33 +9,13 @@ async function signIn(request: APIRequestContext, role: string) {
       csrfToken: csrf.csrfToken,
       email: `${role}@atria.edu`,
       password: process.env.DEMO_PASSWORD || "PriymDemo1!",
-      otp: ["hod", "admin"].includes(role)
-        ? authenticator.generate(process.env.DEMO_TOTP_SECRET!)
-        : "",
+      otp: ["hod", "admin"].includes(role) ? demoOtp(role) : "",
       callbackUrl: "http://localhost:3000/dashboard",
     },
     headers: { "X-Auth-Return-Redirect": "1" },
   });
   expect(response.status()).toBe(200);
-  const me = await request.get("/api/v1/submissions");
-  if (me.status() === 401 && ["hod", "admin"].includes(role)) {
-    // A preceding test may have consumed the current one-time TOTP interval.
-    await new Promise((resolve) =>
-      setTimeout(resolve, 30000 - (Date.now() % 30000) + 150),
-    );
-    const next = await (await request.get("/api/auth/csrf")).json();
-    await request.post("/api/auth/callback/credentials", {
-      form: {
-        csrfToken: next.csrfToken,
-        email: `${role}@atria.edu`,
-        password: process.env.DEMO_PASSWORD || "PriymDemo1!",
-        otp: authenticator.generate(process.env.DEMO_TOTP_SECRET!),
-        callbackUrl: "http://localhost:3000/dashboard",
-      },
-      headers: { "X-Auth-Return-Redirect": "1" },
-    });
-    expect((await request.get("/api/v1/submissions")).status()).toBe(200);
-  } else expect(me.status()).toBe(200);
+  expect((await request.get("/api/v1/submissions")).status()).toBe(200);
 }
 test("live HTTP vertical slice, evidence, decisions, role checks and reports", async ({
   playwright,

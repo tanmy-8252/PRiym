@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { test, expect, Page } from "@playwright/test";
 import { PDFDocument } from "pdf-lib";
-import { authenticator } from "otplib";
+import { demoOtp } from "./demo-otp";
 import { mkdir } from "node:fs/promises";
 async function login(page: Page, role: string) {
   await page.goto("/login");
@@ -12,7 +12,7 @@ async function login(page: Page, role: string) {
   if (["hod", "admin"].includes(role))
     await page
       .getByLabel("Authenticator code", { exact: false })
-      .fill(authenticator.generate(process.env.DEMO_TOTP_SECRET!));
+      .fill(demoOtp(role));
   await page.getByRole("button", { name: "Sign in →", exact: true }).click();
   await expect(page).toHaveURL(/dashboard/);
 }

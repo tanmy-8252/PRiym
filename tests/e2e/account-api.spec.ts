@@ -1,7 +1,7 @@
 import "../../src/lib/env";
 import { test, expect, type APIRequestContext } from "@playwright/test";
 import { randomUUID } from "node:crypto";
-import { execFileSync } from "node:child_process";
+import { demoOtp } from "./demo-otp";
 import { db } from "../../src/lib/db";
 import { assertLocalDemo } from "../../src/lib/demo";
 const baseURL = process.env.E2E_BASE_URL || "http://127.0.0.1:3000";
@@ -103,22 +103,10 @@ test("registration immediately delivers private verification mail, requires appr
     expect(
       (await (await student.get("/api/auth/session")).json())?.user,
     ).toBeUndefined();
-    const codes = JSON.parse(
-      execFileSync(
-        process.execPath,
-        ["--import", "tsx", "scripts/demo-otp.ts", "--role", "ADMIN", "--json"],
-        { encoding: "utf8", timeout: 40000 },
-      ),
-    );
+    const otp = demoOtp("ADMIN");
     expect(
-      (
-        await signIn(
-          admin,
-          "admin@atria.edu",
-          process.env.DEMO_PASSWORD!,
-          codes.codes[0].code,
-        )
-      ).url,
+      (await signIn(admin, "admin@atria.edu", process.env.DEMO_PASSWORD!, otp))
+        .url,
     ).toBe(`${baseURL}/dashboard`);
     expect(
       (
