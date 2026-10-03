@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 export async function mutate(url: string, method: string, payload: unknown) {
   const r = await fetch(url, {
@@ -13,12 +13,18 @@ export async function mutate(url: string, method: string, payload: unknown) {
 }
 export function AccountActions({
   id,
+  name,
+  email,
+  usn,
   status,
   role,
   mentorId,
   faculty,
 }: {
   id: string;
+  name: string;
+  email: string;
+  usn: string | null;
   status: string;
   role: string;
   mentorId: string | null;
@@ -27,11 +33,25 @@ export function AccountActions({
   const router = useRouter();
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [confirmRemoval, setConfirmRemoval] = useState(false);
   async function update(payload: unknown) {
     setBusy(true);
     setError("");
     try {
       await mutate(`/api/v1/admin/users/${id}`, "PATCH", payload);
+      router.refresh();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function removeRequest() {
+    setBusy(true);
+    setError("");
+    try {
+      await mutate(`/api/v1/admin/users/${id}`, "DELETE", { email });
+      setConfirmRemoval(false);
       router.refresh();
     } catch (e) {
       setError((e as Error).message);
@@ -51,6 +71,19 @@ export function AccountActions({
         >
           {status === "ACTIVE" ? "Deactivate" : "Approve & activate"}
         </button>
+        {status === "PENDING" && ["STUDENT", "FACULTY"].includes(role) && (
+          <button
+            className="btn secondary"
+            style={{ color: "#a15445", borderColor: "#dfb4ae" }}
+            disabled={busy}
+            onClick={() => {
+              setError("");
+              setConfirmRemoval(true);
+            }}
+          >
+            Remove request
+          </button>
+        )}
         <select
           aria-label="Account role"
           className="filter-input"
@@ -79,7 +112,18 @@ export function AccountActions({
           </select>
         )}
       </div>
-      {error && (
+      {confirmRemoval && (
+        <RemovalConfirmation
+          name={name}
+          email={email}
+          usn={usn}
+          busy={busy}
+          error={error}
+          onCancel={() => setConfirmRemoval(false)}
+          onConfirm={() => void removeRequest()}
+        />
+      )}
+      {error && !confirmRemoval && (
         <p
           className="small"
           role="alert"
@@ -89,6 +133,91 @@ export function AccountActions({
         </p>
       )}
     </div>
+  );
+}
+function RemovalConfirmation({
+  name,
+  email,
+  usn,
+  busy,
+  error,
+  onCancel,
+  onConfirm,
+}: {
+  name: string;
+  email: string;
+  usn: string | null;
+  busy: boolean;
+  error: string;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const cancelRef = useRef<HTMLButtonElement>(null);
+  const titleId = useId();
+  const descriptionId = useId();
+  useEffect(() => {
+    const dialog = dialogRef.current!;
+    dialog.showModal();
+    cancelRef.current?.focus();
+    return () => dialog.close();
+  }, []);
+  return (
+    <dialog
+      ref={dialogRef}
+      className="removal-dialog"
+      aria-labelledby={titleId}
+      aria-describedby={descriptionId}
+      onCancel={(event) => {
+        event.preventDefault();
+        if (!busy) onCancel();
+      }}
+    >
+      <h2 id={titleId}>Remove registration request?</h2>
+      <div
+        className="notice"
+        style={{ margin: "18px 0", overflowWrap: "anywhere" }}
+      >
+        <strong>{name}</strong>
+        <p>{email}</p>
+        {usn && <p>{usn}</p>}
+      </div>
+      <p id={descriptionId} className="small muted">
+        This permanently removes the pending request and its verification links.
+        The email and USN can then be used for a corrected registration. This
+        cannot be undone.
+      </p>
+      {error && (
+        <p
+          role="alert"
+          className="small"
+          style={{ color: "#a15445", marginTop: 12 }}
+        >
+          {error}
+        </p>
+      )}
+      <div
+        className="form-actions"
+        style={{ justifyContent: "flex-end", marginTop: 22 }}
+      >
+        <button
+          ref={cancelRef}
+          className="btn secondary"
+          disabled={busy}
+          onClick={onCancel}
+        >
+          Cancel
+        </button>
+        <button
+          className="btn"
+          style={{ background: "#a15445" }}
+          disabled={busy}
+          onClick={onConfirm}
+        >
+          {busy ? "Removing…" : "Remove permanently"}
+        </button>
+      </div>
+    </dialog>
   );
 }
 export function CreateUserForm({

@@ -87,6 +87,9 @@ export default async function Admin({
                     <td>
                       <AccountActions
                         id={u.id}
+                        name={u.name}
+                        email={u.email}
+                        usn={u.usn}
                         status={u.status}
                         role={u.role}
                         mentorId={u.mentorId}
@@ -114,7 +117,9 @@ export default async function Admin({
           </div>
           <p className="tiny muted" style={{ marginTop: 15 }}>
             Users must verify their institutional email before activation. Role
-            or status changes revoke active sessions.
+            or status changes revoke active sessions. Remove request permanently
+            clears an unused pending Student or Faculty registration and frees
+            its email and USN for a corrected signup.
           </p>
           <div className="form-actions">
             <span className="small muted">
