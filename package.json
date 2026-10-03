@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "WATCHPACK_POLLING=true next dev --webpack --hostname 127.0.0.1",
     "build": "prisma generate && next build",
+    "vercel-build": "prisma generate && prisma migrate deploy && next build",
     "start": "node scripts/start.mjs",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",

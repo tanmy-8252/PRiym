@@ -152,5 +152,5 @@ npm run worker
 
 The demo seed requires `SEED_DEMO=true`, `DEMO_PASSWORD` and `DEMO_TOTP_SECRET`; it refuses production execution. SQL migrations are committed under `prisma/migrations`. `db:deploy` applies existing migrations; `db:migrate -- --name change` creates future migrations against standard PostgreSQL. Production runtime: `npm run build`, then `npm start` (see deployment notes for database release steps, storage and scheduling).
 
-See [`Deployment`](docs/DEPLOYMENT.md) for Docker, Vercel, migrations, private storage and maintenance. Nothing has been deployed. See `docs/STATUS.md` for the delivered scope, optional extensions and target-environment acceptance work.
+See [`Deployment`](docs/DEPLOYMENT.md) for Docker, migrations, private storage and maintenance, and [`Vercel through GitHub`](docs/VERCEL.md) for hosted PostgreSQL, production variables and the first administrator. See `docs/STATUS.md` for the delivered scope, optional extensions and target-environment acceptance work.
 # PRiym

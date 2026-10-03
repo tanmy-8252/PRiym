@@ -16,7 +16,7 @@ Set a managed PostgreSQL TLS connection, appropriate `PG_POOL_MAX`, unique rando
 
 Run migrations as a separate release step using migration credentials. The web container does not ship the migration CLI. Use a restricted runtime database account without schema/trigger-altering privilege. Configure database backups and recovery drills before the pilot.
 
-Vercel: use this project as the root, `npm ci`, `npm run build`, managed PostgreSQL and private Supabase. Its request-body limit is smaller than 10 MB. Complete direct signed upload/finalize before accepting full-size evidence there, or host the pilot on Node/Docker. Local storage is not persistent on Vercel.
+Vercel: follow [VERCEL.md](VERCEL.md) to import the GitHub repository, connect hosted PostgreSQL, set production variables and bootstrap the first administrator. `vercel.json` installs dependencies and runs migrations before building. Complete direct signed upload/finalize with external scanning before accepting evidence there, or host the pilot on Node/Docker. Local evidence and queued report storage are not persistent on Vercel.
 
 Set `EMAIL_PROVIDER=resend`, a verified `EMAIL_FROM` and `RESEND_API_KEY` for mail. The API adapter follows [Resend Send Email](https://resend.com/docs/api-reference/emails/send-email) and uses [idempotency keys](https://resend.com/docs/dashboard/emails/idempotency-keys) to reduce duplicate delivery. In development, `EMAIL_PROVIDER=file` writes a private local inbox.
 

@@ -13,3 +13,5 @@ src/generated/
 
 .next-check/
 .DS_Store
+.vercel/
+.cache/
