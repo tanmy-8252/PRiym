@@ -1,23 +1,30 @@
 import "../src/lib/env";
 import { db } from "../src/lib/db";
 import { bootstrapAdministrator } from "../src/server/bootstrap";
+import {
+  BootstrapSetupError,
+  bootstrapFailureMessage,
+} from "../src/lib/bootstrap-errors";
 
 // Provisioning is an explicit operator action using private deployment settings.
 // There is no public bootstrap API. Default deployments never create accounts.
 if (process.env.BOOTSTRAP_ADMIN_ENABLED === "true") {
   try {
     if (process.env.VERCEL_ENV !== "production")
-      throw new Error(
-        "Bootstrap is restricted to Vercel Production deployments.",
-      );
+      throw new BootstrapSetupError("production");
     if (
       (process.env.AUTH_SECRET?.length || 0) < 32 ||
-      (process.env.AUDIT_SECRET?.length || 0) < 32 ||
-      new URL(process.env.AUTH_URL || "").protocol !== "https:"
+      (process.env.AUDIT_SECRET?.length || 0) < 32
     )
-      throw new Error(
-        "Production application secrets and canonical URL are required.",
-      );
+      throw new BootstrapSetupError("applicationSecrets");
+    let canonicalUrl: URL;
+    try {
+      canonicalUrl = new URL(process.env.AUTH_URL || "");
+    } catch {
+      throw new BootstrapSetupError("canonicalUrl");
+    }
+    if (canonicalUrl.protocol !== "https:")
+      throw new BootstrapSetupError("canonicalUrl");
     const email = process.env.BOOTSTRAP_ADMIN_EMAIL?.toLowerCase();
     const existing = await db.user.findUnique({
       where: { email: email || "" },
@@ -37,9 +44,9 @@ if (process.env.BOOTSTRAP_ADMIN_ENABLED === "true") {
         "Initial Admin and CSE provisioned. Remove BOOTSTRAP_ADMIN_* settings now.",
       );
     }
-  } catch {
+  } catch (error) {
     console.error(
-      "Initial Admin setup failed. Check the private bootstrap settings; an existing Admin can only manage accounts through the authenticated portal.",
+      `Initial Admin setup failed: ${bootstrapFailureMessage(error)}`,
     );
     process.exitCode = 1;
   } finally {

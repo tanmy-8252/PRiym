@@ -4,6 +4,7 @@ import { encrypt } from "@/lib/crypto";
 import { hash } from "bcryptjs";
 import { audit } from "./audit";
 import { z } from "zod";
+import { BootstrapSetupError } from "@/lib/bootstrap-errors";
 
 export async function bootstrapAdministrator(raw: unknown, database = db) {
   const d = z
@@ -18,9 +19,7 @@ export async function bootstrapAdministrator(raw: unknown, database = db) {
     async (tx) => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(913826)`;
       if (await tx.user.count({ where: { role: "ADMIN" } }))
-        throw new Error(
-          "An Admin already exists. Use the authenticated administration portal.",
-        );
+        throw new BootstrapSetupError("existingAdmin");
       const department = await tx.department.upsert({
         where: { code: "CSE" },
         create: { code: "CSE", name: "Computer Science & Engineering (CSE)" },

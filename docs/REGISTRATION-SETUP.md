@@ -77,6 +77,12 @@ Admin/Institution and confirm CSE exists. **Delete all five `BOOTSTRAP_ADMIN_*`
 variables from Vercel immediately, then redeploy.** The database account remains.
 Do not rotate `AUTH_SECRET`: encrypted MFA depends on it.
 
+If deployment fails at initial Admin setup, read the final build-log line. It
+names an invalid `BOOTSTRAP_ADMIN_*` field or a database conflict without printing
+private values. `BOOTSTRAP_ADMIN_MFA_SECRET` needs the full setup key, not a
+six-digit code. Correct the indicated Secret privately in Vercel and redeploy;
+bootstrap does not overwrite existing administrator credentials.
+
 ## 3. Verify real registration and email
 
 Open the primary `/account?mode=register`. Choose Student or Faculty and CSE.
