@@ -29,6 +29,7 @@ export async function authenticate(raw: unknown, request?: Request) {
       }
       if (
         user.status !== "ACTIVE" ||
+        user.removedAt ||
         !user.emailVerified ||
         (user.lockedUntil && user.lockedUntil > new Date())
       )

@@ -25,7 +25,7 @@ export default async function Institution() {
       select: { id: true, name: true },
     }),
     db.user.findMany({
-      where: { role: "STUDENT" },
+      where: { role: "STUDENT", removedAt: null },
       select: { id: true, name: true },
     }),
     db.badge.findMany(),
@@ -170,7 +170,8 @@ export default async function Institution() {
             <details key={c.id} style={{ marginTop: 15 }}>
               <summary>
                 {faculty.find((f) => f.id === c.facultyId)?.name} /{" "}
-                {students.find((s) => s.id === c.studentId)?.name}
+                {students.find((s) => s.id === c.studentId)?.name ??
+                  "Removed account"}
               </summary>
               <p>{c.reason}</p>
               <InstitutionForm

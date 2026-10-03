@@ -59,7 +59,7 @@ export async function configure(actor: User, raw: unknown) {
     async (tx) => {
       if (d.action === "FORCE_RESET") {
         const u = await tx.user.findUnique({ where: { id: d.id } });
-        assert(u, 404, "NOT_FOUND", "User not found.");
+        assert(u && !u.removedAt, 404, "NOT_FOUND", "User not found.");
         await issueToken(tx, u, "RESET");
         await tx.authSession.updateMany({
           where: { userId: u.id, revokedAt: null },
@@ -203,6 +203,7 @@ export async function configure(actor: User, raw: unknown) {
           where: {
             id: d.studentId,
             role: "STUDENT",
+            removedAt: null,
             departmentId: faculty.departmentId,
           },
         });

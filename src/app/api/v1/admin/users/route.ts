@@ -15,6 +15,7 @@ export async function GET() {
   try {
     const u = await requireUser(["ADMIN"]);
     const rows = await db.user.findMany({
+      where: { removedAt: null },
       select: {
         name: true,
         email: true,

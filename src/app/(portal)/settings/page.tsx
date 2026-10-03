@@ -12,7 +12,7 @@ export default async function Settings() {
     where: { departmentId: u.departmentId },
   });
   const students = await db.user.findMany({
-    where: { role: "STUDENT", departmentId: u.departmentId },
+    where: { role: "STUDENT", departmentId: u.departmentId, removedAt: null },
     select: { id: true, name: true },
   });
   return (

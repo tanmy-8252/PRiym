@@ -35,7 +35,7 @@ export default async function Student({
     <>
       <Heading
         title={student.name}
-        description={`${student.usn} · ${student.department.name} · ${total._sum.amount || 0} points`}
+        description={`${student.removedAt ? "Removed account · Retained academic record" : student.usn} · ${student.department.name} · ${total._sum.amount || 0} points`}
       />
       <div className="stack">
         <Card title="Merit profile">

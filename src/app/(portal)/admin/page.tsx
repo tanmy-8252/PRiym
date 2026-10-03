@@ -15,17 +15,20 @@ export default async function Admin({
 }) {
   const q = await searchParams,
     page = Math.max(1, Math.floor(Number(q.page) || 1));
-  const where = q.q
-    ? {
-        OR: [
-          { name: { contains: q.q, mode: "insensitive" as const } },
-          { email: { contains: q.q, mode: "insensitive" as const } },
-          { usn: { contains: q.q, mode: "insensitive" as const } },
-        ],
-      }
-    : {};
-  const count = await db.user.count({ where });
   await pageUser(["ADMIN"]);
+  const where = {
+    removedAt: null,
+    ...(q.q
+      ? {
+          OR: [
+            { name: { contains: q.q, mode: "insensitive" as const } },
+            { email: { contains: q.q, mode: "insensitive" as const } },
+            { usn: { contains: q.q, mode: "insensitive" as const } },
+          ],
+        }
+      : {}),
+  };
+  const count = await db.user.count({ where });
   const [users, categories, departments] = await Promise.all([
     db.user.findMany({
       include: { department: true },
@@ -119,7 +122,9 @@ export default async function Admin({
             Users must verify their institutional email before activation. Role
             or status changes revoke active sessions. Remove request permanently
             clears an unused pending Student or Faculty registration and frees
-            its email and USN for a corrected signup.
+            its email and USN for a corrected signup. Deactivate an existing
+            account to reveal Remove account. Removal preserves academic and
+            audit history and cannot be undone.
           </p>
           <div className="form-actions">
             <span className="small muted">

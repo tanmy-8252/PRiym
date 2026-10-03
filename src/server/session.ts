@@ -16,7 +16,8 @@ export async function currentUser() {
     record.revokedAt ||
     record.expiresAt < new Date() ||
     record.lastSeenAt < new Date(Date.now() - 30 * 60_000) ||
-    record.user.status !== "ACTIVE"
+    record.user.status !== "ACTIVE" ||
+    record.user.removedAt
   )
     return null;
   if (Date.now() - record.lastSeenAt.getTime() > 60_000)

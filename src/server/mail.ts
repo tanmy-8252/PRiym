@@ -114,7 +114,7 @@ export async function deliverMail(messageIds?: readonly string[]) {
 export async function queueNotificationEmail() {
   return db.$transaction(async (tx) => {
     const pending = await tx.notification.findMany({
-      where: { emailedAt: null },
+      where: { emailedAt: null, user: { removedAt: null } },
       include: { user: true },
       orderBy: { createdAt: "asc" },
       take: 100,

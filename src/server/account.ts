@@ -19,6 +19,7 @@ export async function issueToken(
   user: User,
   purpose: "VERIFY" | "RESET",
 ) {
+  assert(!user.removedAt, 404, "NOT_FOUND", "Account not found.");
   const raw = randomBytes(32).toString("hex");
   await tx.accountToken.updateMany({
     where: { userId: user.id, purpose, usedAt: null },
@@ -117,6 +118,7 @@ export async function requestAccountLink(
     const u = await tx.user.findUnique({ where: { email: d.email } });
     if (
       !u ||
+      u.removedAt ||
       u.status === "INACTIVE" ||
       (d.purpose === "VERIFY" && u.emailVerified)
     )
@@ -157,6 +159,14 @@ export async function consumeAccountToken(
       });
       assert(
         t && t.purpose === d.purpose && !t.usedAt && t.expiresAt > new Date(),
+        422,
+        "INVALID_TOKEN",
+        "This link is invalid or expired. Request a new one.",
+      );
+      await tx.$queryRaw`SELECT "id" FROM "User" WHERE "id" = ${t.userId} FOR UPDATE`;
+      const owner = await tx.user.findUnique({ where: { id: t.userId } });
+      assert(
+        owner && !owner.removedAt,
         422,
         "INVALID_TOKEN",
         "This link is invalid or expired. Request a new one.",

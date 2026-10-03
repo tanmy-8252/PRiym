@@ -87,6 +87,7 @@ export async function removeRegistrationRequest(
     async (tx) => {
       // Share the authentication/account-link lock and recheck the account after it.
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${email}))`;
+      await tx.$queryRaw`SELECT "id" FROM "User" WHERE "id" = ${id} FOR UPDATE`;
       const target = await tx.user.findUnique({
         where: { id },
         select: {
@@ -224,7 +225,7 @@ export async function updateUser(actor: User, id: string, raw: unknown) {
   );
   return db.$transaction(async (tx) => {
     const target = await tx.user.findUnique({ where: { id } });
-    assert(target, 404, "NOT_FOUND", "Account not found.");
+    assert(target && !target.removedAt, 404, "NOT_FOUND", "Account not found.");
     const role = d.role || target.role;
     assert(
       !["HOD", "ADMIN"].includes(role) || target.mfaSecret,
@@ -261,7 +262,16 @@ export async function updateUser(actor: User, id: string, raw: unknown) {
         "EMAIL_UNVERIFIED",
         "The user must verify their email before activation.",
       );
-    await tx.user.update({ where: { id }, data: d });
+    const changed = await tx.user.updateMany({
+      where: { id, removedAt: null },
+      data: d,
+    });
+    assert(
+      changed.count === 1,
+      409,
+      "ACCOUNT_CHANGED",
+      "The account changed. Refresh the approval panel.",
+    );
     if (d.status === "ACTIVE" && target.status !== "ACTIVE")
       await queueMail(
         tx,

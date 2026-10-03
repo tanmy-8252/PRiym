@@ -1,6 +1,7 @@
 import { api } from "@/server/http";
 import { requireUser } from "@/server/session";
-import { updateUser, removeRegistrationRequest } from "@/server/admin";
+import { updateUser } from "@/server/admin";
+import { removeAccount } from "@/server/account-removal";
 export async function PATCH(
   r: Request,
   c: { params: Promise<{ id: string }> },
@@ -18,7 +19,7 @@ export async function DELETE(
   c: { params: Promise<{ id: string }> },
 ) {
   return api(r, async () =>
-    removeRegistrationRequest(
+    removeAccount(
       await requireUser(["ADMIN"]),
       (await c.params).id,
       await r.json(),

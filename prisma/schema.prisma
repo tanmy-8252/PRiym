@@ -53,6 +53,7 @@ model User {
   passwordHash String
   role Role @default(STUDENT)
   status AccountStatus @default(PENDING)
+  removedAt DateTime?
   emailVerified Boolean @default(false)
   departmentId String
   department Department @relation(fields: [departmentId], references: [id])

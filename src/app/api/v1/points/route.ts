@@ -23,6 +23,7 @@ export async function POST(r: Request) {
       const s = await tx.user.findUnique({ where: { id: d.userId } });
       assert(
         s?.role === "STUDENT" &&
+          !s.removedAt &&
           (u.role === "ADMIN" || s.departmentId === u.departmentId),
         403,
         "FORBIDDEN",

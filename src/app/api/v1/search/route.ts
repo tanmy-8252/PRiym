@@ -13,6 +13,7 @@ export async function GET(r: Request) {
         where: {
           ...scope,
           role: "STUDENT",
+          removedAt: null,
           ...(u.role === "FACULTY" ? { mentorId: u.id } : {}),
           OR: [
             { name: { contains: q, mode: "insensitive" } },
@@ -26,6 +27,7 @@ export async function GET(r: Request) {
         where: {
           ...scope,
           role: "FACULTY",
+          removedAt: null,
           name: { contains: q, mode: "insensitive" },
         },
         select: { id: true, name: true },

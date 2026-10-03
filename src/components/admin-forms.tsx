@@ -50,7 +50,7 @@ export function AccountActions({
     setBusy(true);
     setError("");
     try {
-      await mutate(`/api/v1/admin/users/${id}`, "DELETE", { email });
+      await mutate(`/api/v1/admin/users/${id}`, "DELETE", { email, status });
       setConfirmRemoval(false);
       router.refresh();
     } catch (e) {
@@ -69,9 +69,14 @@ export function AccountActions({
             void update({ status: status === "ACTIVE" ? "INACTIVE" : "ACTIVE" })
           }
         >
-          {status === "ACTIVE" ? "Deactivate" : "Approve & activate"}
+          {status === "ACTIVE"
+            ? "Deactivate"
+            : status === "INACTIVE"
+              ? "Reactivate"
+              : "Approve & activate"}
         </button>
-        {status === "PENDING" && ["STUDENT", "FACULTY"].includes(role) && (
+        {(status === "INACTIVE" ||
+          (status === "PENDING" && ["STUDENT", "FACULTY"].includes(role))) && (
           <button
             className="btn secondary"
             style={{ color: "#a15445", borderColor: "#dfb4ae" }}
@@ -81,7 +86,7 @@ export function AccountActions({
               setConfirmRemoval(true);
             }}
           >
-            Remove request
+            {status === "INACTIVE" ? "Remove account" : "Remove request"}
           </button>
         )}
         <select
@@ -117,6 +122,7 @@ export function AccountActions({
           name={name}
           email={email}
           usn={usn}
+          deactivated={status === "INACTIVE"}
           busy={busy}
           error={error}
           onCancel={() => setConfirmRemoval(false)}
@@ -139,6 +145,7 @@ function RemovalConfirmation({
   name,
   email,
   usn,
+  deactivated,
   busy,
   error,
   onCancel,
@@ -147,6 +154,7 @@ function RemovalConfirmation({
   name: string;
   email: string;
   usn: string | null;
+  deactivated: boolean;
   busy: boolean;
   error: string;
   onCancel: () => void;
@@ -173,7 +181,11 @@ function RemovalConfirmation({
         if (!busy) onCancel();
       }}
     >
-      <h2 id={titleId}>Remove registration request?</h2>
+      <h2 id={titleId}>
+        {deactivated
+          ? "Remove deactivated account?"
+          : "Remove registration request?"}
+      </h2>
       <div
         className="notice"
         style={{ margin: "18px 0", overflowWrap: "anywhere" }}
@@ -183,7 +195,9 @@ function RemovalConfirmation({
         {usn && <p>{usn}</p>}
       </div>
       <p id={descriptionId} className="small muted">
-        This permanently removes the pending request and its verification links.
+        {deactivated
+          ? "This permanently removes login access and the account from this panel. Achievements, points, reviews and audit history are retained. Open assigned reviews go to the HOD for reassignment."
+          : "This permanently removes the pending request and its verification links."}{" "}
         The email and USN can then be used for a corrected registration. This
         cannot be undone.
       </p>
