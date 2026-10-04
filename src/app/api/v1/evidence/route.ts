@@ -4,9 +4,18 @@ import { MAX_FILE_BYTES, storeEvidence } from "@/server/storage";
 import { assert } from "@/lib/errors";
 import { db } from "@/lib/db";
 import { audit } from "@/server/audit";
+import { evidenceMimeType } from "@/lib/evidence-files";
+export const maxDuration = 60;
+export const runtime = "nodejs";
 export async function POST(r: Request) {
   return api(r, async () => {
     const u = await requireUser(["STUDENT"]);
+    assert(
+      !process.env.VERCEL,
+      422,
+      "DIRECT_UPLOAD_REQUIRED",
+      "Refresh the page to use the secure direct upload.",
+    );
     const recent = await db.evidence.count({
       where: {
         ownerId: u.id,
@@ -43,7 +52,7 @@ export async function POST(r: Request) {
     const stored = await storeEvidence(
       u.id,
       Buffer.concat(chunks),
-      r.headers.get("content-type") || "",
+      evidenceMimeType(name, r.headers.get("content-type") || ""),
       name,
     );
     const evidence = await db.$transaction(async (tx) => {

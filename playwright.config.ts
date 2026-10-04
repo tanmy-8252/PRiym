@@ -21,10 +21,13 @@ export default defineConfig({
       },
     },
   ],
-  webServer: {
-    command: "npm run dev",
-    url: "http://localhost:3000/login",
-    reuseExistingServer: !process.env.CI,
-    timeout: 120000,
-  },
+  // An explicit base URL uses a server already started by the caller.
+  webServer: process.env.E2E_BASE_URL
+    ? undefined
+    : {
+        command: "npm run dev",
+        url: "http://localhost:3000/login",
+        reuseExistingServer: !process.env.CI,
+        timeout: 120000,
+      },
 });

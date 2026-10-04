@@ -62,7 +62,7 @@ test("student uploads, faculty approves, points and status appear for both users
     buffer: Buffer.from(await pdf.save()),
   });
   await expect(
-    student.getByText("browser-evidence.pdf", { exact: true }),
+    student.getByText("browser-evidence.pdf · Uploaded", { exact: true }),
   ).toBeVisible();
   await student.getByRole("button", { name: "Submit for review" }).click();
   await expect(student).toHaveURL(/submissions\/[a-f0-9-]+$/);

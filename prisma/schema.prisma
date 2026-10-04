@@ -80,6 +80,7 @@ model User {
   assigned Submission[] @relation("ReviewerSubmissions")
   events VerificationEvent[]
   evidence Evidence[]
+  evidenceUploads EvidenceUpload[]
   ledger PointEntry[] @relation("StudentPoints")
   awards PointEntry[] @relation("ActorPoints")
   badges UserBadge[]
@@ -186,6 +187,21 @@ model Submission {
   @@index([studentId, status])
   @@index([departmentId, status, submittedAt])
   @@index([reviewerId, escalated, status])
+}
+model EvidenceUpload {
+  id String @id @default(uuid())
+  ownerId String
+  owner User @relation(fields:[ownerId], references:[id])
+  storageKey String @unique
+  fileName String
+  mimeType String
+  sizeBytes Int
+  status String @default("PENDING")
+  evidenceId String?
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  @@index([ownerId, createdAt])
+  @@index([expiresAt, status])
 }
 model Evidence {
   id String @id @default(uuid())

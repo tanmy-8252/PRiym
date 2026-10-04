@@ -20,6 +20,12 @@ export async function GET(r: Request, c: { params: Promise<{ id: string }> }) {
       "NOT_FOUND",
       "Evidence not found.",
     );
+    assert(
+      process.env.NODE_ENV !== "production" || e.scanStatus === "CLEAN",
+      422,
+      "EVIDENCE_NOT_VERIFIED",
+      "This evidence has not passed its security scan.",
+    );
     // BR-014: administrators need an explicitly documented exception.
     if (u.role === "ADMIN") {
       const reason = new URL(r.url).searchParams.get("reason") || "";

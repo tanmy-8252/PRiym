@@ -224,7 +224,12 @@ export async function saveSubmission(user: User, raw: unknown, id?: string) {
       });
       assert(
         evidence.length === d.evidenceIds.length &&
-          evidence.every((e) => !e.submissionId || e.submissionId === id),
+          evidence.every(
+            (e) =>
+              (!e.submissionId || e.submissionId === id) &&
+              (process.env.NODE_ENV !== "production" ||
+                e.scanStatus === "CLEAN"),
+          ),
         422,
         "INVALID_EVIDENCE",
         "Evidence must be your own uploaded documents.",

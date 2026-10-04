@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { test, expect, APIRequestContext } from "@playwright/test";
 import { demoOtp } from "./demo-otp";
 import { PDFDocument } from "pdf-lib";
+const baseURL = process.env.E2E_BASE_URL || "http://localhost:3000";
 async function signIn(request: APIRequestContext, role: string) {
   const csrf = await (await request.get("/api/auth/csrf")).json();
   const response = await request.post("/api/auth/callback/credentials", {
@@ -10,7 +11,7 @@ async function signIn(request: APIRequestContext, role: string) {
       email: `${role}@atria.edu`,
       password: process.env.DEMO_PASSWORD || "PriymDemo1!",
       otp: ["hod", "admin"].includes(role) ? demoOtp(role) : "",
-      callbackUrl: "http://localhost:3000/dashboard",
+      callbackUrl: `${baseURL}/dashboard`,
     },
     headers: { "X-Auth-Return-Redirect": "1" },
   });
@@ -21,8 +22,8 @@ test("live HTTP vertical slice, evidence, decisions, role checks and reports", a
   playwright,
 }) => {
   const options = {
-    baseURL: "http://localhost:3000",
-    extraHTTPHeaders: { Origin: "http://localhost:3000" },
+    baseURL,
+    extraHTTPHeaders: { Origin: new URL(baseURL).origin },
   };
   const student = await playwright.request.newContext(options),
     faculty = await playwright.request.newContext(options),
@@ -36,10 +37,20 @@ test("live HTTP vertical slice, evidence, decisions, role checks and reports", a
   ).categoryId;
   const pdf = await PDFDocument.create();
   pdf.addPage().drawText("Synthetic live HTTP evidence");
+  const pdfBytes = Buffer.from(await pdf.save());
+  const prepared = await student.post("/api/v1/evidence/uploads", {
+    data: {
+      fileName: "live-http-proof.pdf",
+      mimeType: "application/pdf",
+      sizeBytes: pdfBytes.length,
+    },
+  });
+  expect(prepared.status()).toBe(200);
+  expect((await prepared.json()).data.transport).toBe("server");
   const upload = await student.post(
     "/api/v1/evidence?name=live-http-proof.pdf",
     {
-      data: Buffer.from(await pdf.save()),
+      data: pdfBytes,
       headers: { "Content-Type": "application/pdf" },
     },
   );

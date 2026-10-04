@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { Upload, FileText, X } from "lucide-react";
 import { LEVELS, institutionDate } from "@/lib/rules";
 import { label } from "./ui";
+import { uploadEvidenceFile } from "@/lib/evidence-upload";
 type Evidence = { id: string; fileName: string };
 export type FormInitial = {
   id: string;
@@ -41,29 +42,33 @@ export function AchievementForm({
   const [evidence, setEvidence] = useState<Evidence[]>(initial?.evidence ?? []);
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [uploadFailures, setUploadFailures] = useState<
+    { file: File; message: string }[]
+  >([]);
   const [error, setError] = useState("");
   const [duplicate, setDuplicate] = useState(false);
   const [confirmDuplicate, setConfirmDuplicate] = useState(false);
-  async function upload(files: FileList | null) {
-    if (!files) return;
+  async function upload(files: File[]) {
+    if (!files.length) return;
     setUploading(true);
     setError("");
+    setUploadFailures([]);
     try {
       if (evidence.length + files.length > 5)
         throw new Error("Attach at most five files.");
-      const items: Evidence[] = [];
-      for (const f of Array.from(files)) {
-        if (f.size > 10 * 1024 * 1024)
-          throw new Error("Each file must be at most 10 MB.");
-        const r = await fetch(
-          `/api/v1/evidence?name=${encodeURIComponent(f.name)}`,
-          { method: "POST", headers: { "Content-Type": f.type }, body: f },
-        );
-        const body = await r.json();
-        if (!r.ok) throw new Error(body.error.message);
-        items.push(body.data);
+      for (const file of files) {
+        try {
+          const item = await uploadEvidenceFile(file);
+          // Preserve every successful attachment, even if the next file fails.
+          setEvidence((old) => [...old, item]);
+        } catch (e) {
+          const message =
+            e instanceof Error
+              ? e.message
+              : "The upload could not finish. Please try again.";
+          setUploadFailures((old) => [...old, { file, message }]);
+        }
       }
-      setEvidence((old) => [...old, ...items]);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -76,6 +81,14 @@ export function AchievementForm({
     const f = new FormData(form);
     const payload = Object.fromEntries(f.entries());
     try {
+      if (uploadFailures.length)
+        throw new Error(
+          "Retry or remove the failed uploads before saving this achievement.",
+        );
+      if (!draft && !evidence.length)
+        throw new Error(
+          "Choose supporting evidence and wait for its Uploaded confirmation before submitting.",
+        );
       const r = await fetch(
         initial ? `/api/v1/submissions/${initial.id}` : "/api/v1/submissions",
         {
@@ -168,7 +181,6 @@ export function AchievementForm({
             value={categoryId}
             onChange={(e) => setCategoryId(e.target.value)}
             required
-            defaultValue={initial?.categoryId ?? ""}
           >
             <option value="" disabled>
               Select a category
@@ -269,7 +281,7 @@ export function AchievementForm({
             <p className="small">
               <strong>
                 {uploading
-                  ? "Uploading evidence…"
+                  ? "Uploading and checking evidence…"
                   : "Add certificates, letters or other proof"}
               </strong>
             </p>
@@ -283,19 +295,26 @@ export function AchievementForm({
               accept="application/pdf,image/jpeg,image/png,video/mp4"
               multiple
               disabled={busy || uploading}
-              onChange={(e) => void upload(e.target.files)}
+              onChange={(e) => {
+                const files = Array.from(e.currentTarget.files || []);
+                // Clear the chooser so failed files can be selected again. The
+                // attachment list below is the source of truth for saved evidence.
+                e.currentTarget.value = "";
+                void upload(files);
+              }}
             />
           </div>
           {evidence.map((e) => (
             <div className="file-row" key={e.id}>
               <span className="small" style={{ display: "flex", gap: 8 }}>
                 <FileText size={15} />
-                {e.fileName}
+                {e.fileName} · Uploaded
               </span>
               <button
                 type="button"
                 className="btn ghost"
                 aria-label={`Remove ${e.fileName}`}
+                disabled={busy || uploading}
                 onClick={() =>
                   setEvidence((old) => old.filter((x) => x.id !== e.id))
                 }
@@ -304,6 +323,48 @@ export function AchievementForm({
               </button>
             </div>
           ))}
+          {uploadFailures.map(({ file, message }, index) => (
+            <div
+              className="notice error"
+              role="alert"
+              key={`${file.name}-${index}`}
+            >
+              <strong>{file.name} — Upload failed</strong>
+              <p>{message}</p>
+              <button
+                type="button"
+                className="btn secondary"
+                disabled={busy || uploading}
+                onClick={() =>
+                  void upload(uploadFailures.map((item) => item.file))
+                }
+              >
+                Retry failed uploads
+              </button>{" "}
+              <button
+                type="button"
+                className="btn ghost"
+                disabled={busy || uploading}
+                aria-label={`Remove failed upload ${file.name}`}
+                onClick={() =>
+                  setUploadFailures((old) => old.filter((_, i) => i !== index))
+                }
+              >
+                Remove
+              </button>
+            </div>
+          ))}
+          <p
+            className="tiny muted"
+            aria-live="polite"
+            style={{ marginTop: 10 }}
+          >
+            {uploading
+              ? "Please wait while your files upload and finish their security checks."
+              : evidence.length
+                ? `${evidence.length} of 5 files uploaded and ready to attach.`
+                : "Choose a file and wait for its Uploaded confirmation before submitting."}
+          </p>
         </div>
       </div>
       {error && (
@@ -329,7 +390,7 @@ export function AchievementForm({
           <button
             type="button"
             className="btn secondary"
-            disabled={busy || uploading}
+            disabled={busy || uploading || uploadFailures.length > 0}
             onClick={() => {
               const f = document.getElementById(
                 "achievement-form",
@@ -340,7 +401,15 @@ export function AchievementForm({
             Save draft
           </button>
         )}
-        <button className="btn" disabled={busy || uploading}>
+        <button
+          className="btn"
+          disabled={
+            busy ||
+            uploading ||
+            uploadFailures.length > 0 ||
+            evidence.length === 0
+          }
+        >
           {busy
             ? "Saving…"
             : initial && initial.status !== "DRAFT"

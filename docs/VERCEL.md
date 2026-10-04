@@ -55,10 +55,11 @@ existing encrypted MFA secrets and sessions become unusable.
 ## Features requiring additional hosting services
 
 This Vercel setup hosts the application and PostgreSQL-backed functionality.
-Evidence uploads require further work before real use: Vercel limits function
-request bodies to 4.5 MB, while PRiym permits 10 MB, and the current production
-upload adapter requires ClamAV. Direct private uploads, an external malware scan
-and a verified finalize step are needed. Keep the scanner requirement intact.
+Evidence uses direct uploads to private Supabase storage, followed by server-side
+validation, managed malware scanning and a verified finalize step. This avoids
+Vercel's 4.5 MB function request-body limit while retaining the 10 MB per-file
+limit. Configure the private bucket and scanner using [EVIDENCE-SETUP.md](EVIDENCE-SETUP.md).
+Uploading remains unavailable until both services are configured; scanning cannot be bypassed.
 Queued reports currently need persistent file storage, which Vercel's local file
 system does not provide. Small synchronous reports do not use that queue.
 
