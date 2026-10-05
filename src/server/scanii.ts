@@ -113,9 +113,22 @@ export async function scanWithScanii(bytes: Buffer, mime: string) {
     "SCANNER_REQUIRED",
     "The scanner key configured for PRiym is inactive in Scanii. Activate that exact key and save its settings.",
   );
+  const categories = configuredKey.data.detection_categories_enabled;
+  const malwareOnly = categories.length === 1 && categories[0] === "MALWARE";
+  if (!malwareOnly) {
+    // Log only known switch states, never provider data, credentials or file metadata.
+    console.warn("PRiym Scanii detection configuration mismatch", {
+      malware: categories.includes("MALWARE"),
+      unsafeLanguage: categories.includes("NSFW_LANGUAGE"),
+      unsafeImage: categories.includes("NSFW_IMAGE"),
+      otherCategories: categories.filter(
+        (category) =>
+          !["MALWARE", "NSFW_LANGUAGE", "NSFW_IMAGE"].includes(category),
+      ).length,
+    });
+  }
   assert(
-    configuredKey.data.detection_categories_enabled.length === 1 &&
-      configuredKey.data.detection_categories_enabled[0] === "MALWARE",
+    malwareOnly,
     503,
     "SCANNER_REQUIRED",
     "The scanner key configured for PRiym must have only Malware detection enabled in Scanii. Save its settings.",

@@ -133,6 +133,30 @@ it("does not use another key's detection configuration", async () => {
   });
   expect(fetcher).toHaveBeenCalledTimes(1);
 });
+it("logs only safe switch states when the provider reports extra detection", async () => {
+  const warning = vi.spyOn(console, "warn").mockImplementation(() => {});
+  const fetcher = fetchResults({
+    balance: 10,
+    keys: {
+      [key]: {
+        active: true,
+        detection_categories_enabled: ["MALWARE", "NSFW_LANGUAGE", "private-provider-detail"],
+      },
+    },
+  });
+  try {
+    await expect(scan()).rejects.toMatchObject({ code: "SCANNER_REQUIRED" });
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(warning).toHaveBeenCalledWith(
+      "PRiym Scanii detection configuration mismatch",
+      { malware: true, unsafeLanguage: true, unsafeImage: false, otherCategories: 1 },
+    );
+    expect(JSON.stringify(warning.mock.calls)).not.toContain(key);
+    expect(JSON.stringify(warning.mock.calls)).not.toContain("private-provider-detail");
+  } finally {
+    warning.mockRestore();
+  }
+});
 it.each([0, -1])(
   "blocks exhausted trial credits before sending the file",
   async (balance) => {
