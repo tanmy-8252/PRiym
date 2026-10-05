@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Upload, FileText, X } from "lucide-react";
 import { LEVELS, institutionDate } from "@/lib/rules";
@@ -48,6 +48,21 @@ export function AchievementForm({
   const [error, setError] = useState("");
   const [duplicate, setDuplicate] = useState(false);
   const [confirmDuplicate, setConfirmDuplicate] = useState(false);
+  const [scannerUnavailable, setScannerUnavailable] = useState(false);
+  useEffect(() => {
+    const controller = new AbortController();
+    void fetch("/api/v1/evidence/uploads", {
+      cache: "no-store",
+      signal: controller.signal,
+    })
+      .then(async (response) => (response.ok ? response.json() : null))
+      .then((body) => {
+        if (!controller.signal.aborted)
+          setScannerUnavailable(body?.data?.ready === false);
+      })
+      .catch(() => {});
+    return () => controller.abort();
+  }, []);
   async function upload(files: File[]) {
     if (!files.length) return;
     setUploading(true);
@@ -273,6 +288,12 @@ export function AchievementForm({
         </div>
         <div className="field full">
           <label htmlFor="evidence">Supporting evidence *</label>
+          {scannerUnavailable && (
+            <div className="notice error" role="status">
+              Evidence uploads are temporarily unavailable. Please ask an
+              administrator to check the document scanner settings.
+            </div>
+          )}
           <div className="upload">
             <Upload
               size={23}

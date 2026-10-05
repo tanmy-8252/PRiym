@@ -6,7 +6,10 @@ export const runtime = "nodejs";
 export async function GET(request: Request) {
   return api(request, async () => {
     await requireUser(["STUDENT", "FACULTY", "HOD", "ADMIN"]);
-    return scaniiConfigurationStatus();
+    if (process.env.MALWARE_SCANNER !== "scanii") return { ready: null };
+    const status = await scaniiConfigurationStatus();
+    if (!status.ready) console.warn("PRiym scanner preflight", status);
+    return status;
   });
 }
 export async function POST(request: Request) {
