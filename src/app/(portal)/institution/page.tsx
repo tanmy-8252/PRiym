@@ -79,8 +79,8 @@ export default async function Institution() {
             fields={[
               { name: "label", label: "Semester label" },
               { name: "academicYear", label: "Academic year (e.g. 2026–2027)" },
-              { name: "startDate", label: "Starts", type: "date" },
-              { name: "endDate", label: "Ends", type: "date" },
+              { name: "startDate", label: "Starts", type: "iso-date" },
+              { name: "endDate", label: "Ends", type: "iso-date" },
               {
                 name: "active",
                 label: "Make active",
@@ -114,13 +114,13 @@ export default async function Institution() {
                       {
                         name: "startDate",
                         label: "Starts",
-                        type: "date",
+                        type: "iso-date",
                         value: s.startDate.toISOString().slice(0, 10),
                       },
                       {
                         name: "endDate",
                         label: "Ends",
-                        type: "date",
+                        type: "iso-date",
                         value: s.endDate.toISOString().slice(0, 10),
                       },
                       {

@@ -70,10 +70,24 @@ export function InstitutionForm({
               <input
                 id={`${action}-${id || "new"}-${f.name}`}
                 name={f.name}
-                type={f.type || "text"}
+                type={f.type === "iso-date" ? "text" : f.type || "text"}
                 defaultValue={f.type === "checkbox" ? undefined : f.value}
+                placeholder={f.type === "iso-date" ? "YYYY-MM-DD" : undefined}
+                pattern={
+                  f.type === "iso-date"
+                    ? "(?:20[0-9]{2}|2100)-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])"
+                    : undefined
+                }
+                title={
+                  f.type === "iso-date"
+                    ? "Use YYYY-MM-DD with a four-digit year, for example 2026-08-31."
+                    : undefined
+                }
                 required={f.required ?? true}
               />
+            )}
+            {f.type === "iso-date" && (
+              <span className="tiny muted">YYYY-MM-DD · four-digit year</span>
             )}
           </div>
         ))}

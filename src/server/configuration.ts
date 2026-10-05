@@ -8,6 +8,7 @@ import { createUser } from "./admin";
 import { businessDeadline, OPEN_STATUSES } from "@/lib/rules";
 import { evaluateBadges } from "./submissions";
 import { queueMail } from "./mail";
+import { semesterDateSchema } from "@/lib/validation";
 const configSchema = z.discriminatedUnion("action", [
   z.object({
     action: z.literal("DEPARTMENT"),
@@ -22,8 +23,8 @@ const configSchema = z.discriminatedUnion("action", [
       id: z.string().uuid().optional(),
       label: z.string().min(3).max(100),
       academicYear: z.string().min(4).max(30),
-      startDate: z.iso.date(),
-      endDate: z.iso.date(),
+      startDate: semesterDateSchema,
+      endDate: semesterDateSchema,
       active: z.boolean().default(false),
     })
     .refine((d) => d.startDate < d.endDate, "Semester end must follow start."),

@@ -1,5 +1,12 @@
 import { z } from "zod";
 import { LEVELS, institutionDate } from "./rules";
+export const semesterDateSchema = z.iso.date().refine(
+  (value) => {
+    const year = Number(value.slice(0, 4));
+    return year >= 2000 && year <= 2100;
+  },
+  "Enter a four-digit year between 2000 and 2100 (YYYY-MM-DD).",
+);
 export const passwordSchema = z
   .string()
   .min(8)
