@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { requireScanner, scanEvidence } from "@/server/malware";
+import { scaniiConfigurationStatus } from "@/server/scanii";
 
 const bytes = Buffer.from("%PDF-1.7\nScanii adapter test");
 const key = "test-only-scanii-key";
@@ -14,6 +15,32 @@ const clean = {
 const account = { balance: 10, keys: { [key]: activeKey } };
 const scan = () =>
   scanEvidence(bytes, "application/pdf", "private-student.pdf");
+
+it("reports safe configuration state without uploading a file or exposing credentials", async () => {
+  const fetcher = fetchResults({
+    balance: 10,
+    keys: {
+      [key]: {
+        active: true,
+        detection_categories_enabled: ["MALWARE", "NSFW_LANGUAGE"],
+      },
+    },
+  });
+  const status = await scaniiConfigurationStatus();
+  expect(status).toEqual({
+    ready: false,
+    keyPresent: true,
+    keyFormatValid: true,
+    active: true,
+    malware: true,
+    unsafeLanguage: true,
+    unsafeImage: false,
+    otherCategories: 0,
+    hasCredits: true,
+  });
+  expect(fetcher).toHaveBeenCalledTimes(1);
+  expect(JSON.stringify(status)).not.toContain(key);
+});
 
 beforeEach(() => {
   vi.stubEnv("NODE_ENV", "production");

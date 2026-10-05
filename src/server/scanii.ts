@@ -81,10 +81,8 @@ async function requestJson(
   }
 }
 
-export async function scanWithScanii(bytes: Buffer, mime: string) {
+async function readAccount() {
   const { key, authorization, base } = requireScanii();
-  // Check each time: a disabled detection engine must never yield a clean upload.
-  // The malware-only key also prevents unrelated image/language processing.
   const account = accountSchema.safeParse(
     await requestJson(`${base}/account.json`, authorization, 200),
   );
@@ -94,13 +92,45 @@ export async function scanWithScanii(bytes: Buffer, mime: string) {
     "SCANNER_UNAVAILABLE",
     "The document scanner could not verify its configuration. Please retry later.",
   );
+  return { key, authorization, base, account: account.data };
+}
+
+export async function scaniiConfigurationStatus() {
+  const { key, account } = await readAccount();
+  const keyPresent = Object.hasOwn(account.keys, key);
+  const configuredKey = keySchema.safeParse(account.keys[key]);
+  const categories = configuredKey.success
+    ? configuredKey.data.detection_categories_enabled
+    : [];
+  const active = configuredKey.success && configuredKey.data.active;
+  const malwareOnly = categories.length === 1 && categories[0] === "MALWARE";
+  return {
+    ready: keyPresent && active && malwareOnly && account.balance > 0,
+    keyPresent,
+    keyFormatValid: configuredKey.success,
+    active,
+    malware: categories.includes("MALWARE"),
+    unsafeLanguage: categories.includes("NSFW_LANGUAGE"),
+    unsafeImage: categories.includes("NSFW_IMAGE"),
+    otherCategories: categories.filter(
+      (category) =>
+        !["MALWARE", "NSFW_LANGUAGE", "NSFW_IMAGE"].includes(category),
+    ).length,
+    hasCredits: account.balance > 0,
+  };
+}
+
+export async function scanWithScanii(bytes: Buffer, mime: string) {
+  // Check each time: a disabled detection engine must never yield a clean upload.
+  // The malware-only key also prevents unrelated image/language processing.
+  const { key, authorization, base, account } = await readAccount();
   assert(
-    Object.hasOwn(account.data.keys, key),
+    Object.hasOwn(account.keys, key),
     503,
     "SCANNER_REQUIRED",
     "The scanner key configured for PRiym does not match a key in the Scanii account. Check the API key and its matching secret in Vercel.",
   );
-  const configuredKey = keySchema.safeParse(account.data.keys[key]);
+  const configuredKey = keySchema.safeParse(account.keys[key]);
   assert(
     configuredKey.success,
     503,
@@ -134,7 +164,7 @@ export async function scanWithScanii(bytes: Buffer, mime: string) {
     "The scanner key configured for PRiym must have only Malware detection enabled in Scanii. Save its settings.",
   );
   assert(
-    account.data.balance > 0,
+    account.balance > 0,
     503,
     "SCANNER_UNAVAILABLE",
     "The document scanner has reached its usage limit. Contact an administrator or retry later.",
