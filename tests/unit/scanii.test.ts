@@ -36,10 +36,25 @@ it("reports safe configuration state without uploading a file or exposing creden
     unsafeLanguage: true,
     unsafeImage: false,
     otherCategories: 0,
+    unknownCategoryNames: [],
     hasCredits: true,
   });
   expect(fetcher).toHaveBeenCalledTimes(1);
   expect(JSON.stringify(status)).not.toContain(key);
+});
+it("redacts unexpected provider category text in configuration status", async () => {
+  fetchResults({
+    balance: 10,
+    keys: {
+      [key]: {
+        active: true,
+        detection_categories_enabled: ["AV", "private-provider-detail"],
+      },
+    },
+  });
+  const status = await scaniiConfigurationStatus();
+  expect(status.unknownCategoryNames).toEqual(["AV", "[redacted]"]);
+  expect(JSON.stringify(status)).not.toContain("private-provider-detail");
 });
 
 beforeEach(() => {

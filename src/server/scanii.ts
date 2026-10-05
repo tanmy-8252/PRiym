@@ -116,6 +116,15 @@ export async function scaniiConfigurationStatus() {
       (category) =>
         !["MALWARE", "NSFW_LANGUAGE", "NSFW_IMAGE"].includes(category),
     ).length,
+    unknownCategoryNames: categories
+      .filter(
+        (category) =>
+          !["MALWARE", "NSFW_LANGUAGE", "NSFW_IMAGE"].includes(category),
+      )
+      .slice(0, 3)
+      .map((category) =>
+        /^[A-Z][A-Z0-9_]{0,31}$/.test(category) ? category : "[redacted]",
+      ),
     hasCredits: account.balance > 0,
   };
 }
