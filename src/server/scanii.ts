@@ -36,6 +36,12 @@ const keySchema = z.object({
   active: z.boolean(),
   detection_categories_enabled: z.array(z.string()),
 });
+const malwareCategory = (category: string) =>
+  category === "MALWARE" || category === "MALWARE_DETECTION";
+const knownCategory = (category: string) =>
+  malwareCategory(category) ||
+  category === "NSFW_LANGUAGE" ||
+  category === "NSFW_IMAGE";
 const scanSchema = z.object({
   id: z.string().min(1),
   checksum: z.string().regex(/^[a-f0-9]{40}$/i),
@@ -103,24 +109,19 @@ export async function scaniiConfigurationStatus() {
     ? configuredKey.data.detection_categories_enabled
     : [];
   const active = configuredKey.success && configuredKey.data.active;
-  const malwareOnly = categories.length === 1 && categories[0] === "MALWARE";
+  const malwareOnly = categories.length === 1 && malwareCategory(categories[0] ?? "");
   return {
     ready: keyPresent && active && malwareOnly && account.balance > 0,
     keyPresent,
     keyFormatValid: configuredKey.success,
     active,
-    malware: categories.includes("MALWARE"),
+    malware: categories.some(malwareCategory),
     unsafeLanguage: categories.includes("NSFW_LANGUAGE"),
     unsafeImage: categories.includes("NSFW_IMAGE"),
-    otherCategories: categories.filter(
-      (category) =>
-        !["MALWARE", "NSFW_LANGUAGE", "NSFW_IMAGE"].includes(category),
-    ).length,
+    otherCategories: categories.filter((category) => !knownCategory(category))
+      .length,
     unknownCategoryNames: categories
-      .filter(
-        (category) =>
-          !["MALWARE", "NSFW_LANGUAGE", "NSFW_IMAGE"].includes(category),
-      )
+      .filter((category) => !knownCategory(category))
       .slice(0, 3)
       .map((category) =>
         /^[A-Z][A-Z0-9_]{0,31}$/.test(category) ? category : "[redacted]",
@@ -153,17 +154,15 @@ export async function scanWithScanii(bytes: Buffer, mime: string) {
     "The scanner key configured for PRiym is inactive in Scanii. Activate that exact key and save its settings.",
   );
   const categories = configuredKey.data.detection_categories_enabled;
-  const malwareOnly = categories.length === 1 && categories[0] === "MALWARE";
+  const malwareOnly = categories.length === 1 && malwareCategory(categories[0] ?? "");
   if (!malwareOnly) {
     // Log only known switch states, never provider data, credentials or file metadata.
     console.warn("PRiym Scanii detection configuration mismatch", {
-      malware: categories.includes("MALWARE"),
+      malware: categories.some(malwareCategory),
       unsafeLanguage: categories.includes("NSFW_LANGUAGE"),
       unsafeImage: categories.includes("NSFW_IMAGE"),
-      otherCategories: categories.filter(
-        (category) =>
-          !["MALWARE", "NSFW_LANGUAGE", "NSFW_IMAGE"].includes(category),
-      ).length,
+      otherCategories: categories.filter((category) => !knownCategory(category))
+        .length,
     });
   }
   assert(

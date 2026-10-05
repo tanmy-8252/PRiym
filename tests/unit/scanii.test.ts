@@ -109,6 +109,30 @@ it("checks the exact active malware-only key, then accepts completed scans of th
   expect(file.type).toBe("application/pdf");
   expect(Buffer.from(await file.arrayBuffer())).toEqual(bytes);
 });
+it("accepts Scanii's current malware-only category name", async () => {
+  const fetcher = fetchResults({
+    balance: 10,
+    keys: {
+      [key]: { active: true, detection_categories_enabled: ["MALWARE_DETECTION"] },
+    },
+  });
+  expect(await scaniiConfigurationStatus()).toMatchObject({
+    ready: true,
+    malware: true,
+    otherCategories: 0,
+    unknownCategoryNames: [],
+  });
+  // Start a fresh mocked request sequence for the scan itself.
+  const scanFetcher = fetchResults({
+    balance: 10,
+    keys: {
+      [key]: { active: true, detection_categories_enabled: ["MALWARE_DETECTION"] },
+    },
+  });
+  expect(await scan()).toBe("CLEAN");
+  expect(fetcher).toHaveBeenCalledTimes(1);
+  expect(scanFetcher).toHaveBeenCalledTimes(2);
+});
 
 it.each(["us1", "eu1", "eu2", "ap1", "ap2", "ca1"])(
   "uses only the selected supported region %s",
@@ -151,6 +175,7 @@ it.each([
   [{ active: true, detection_categories_enabled: [] }, "only Malware", "SCANNER_REQUIRED"],
   [{ active: true, detection_categories_enabled: ["NSFW_IMAGE"] }, "only Malware", "SCANNER_REQUIRED"],
   [{ active: true, detection_categories_enabled: ["MALWARE", "NSFW_IMAGE"] }, "only Malware", "SCANNER_REQUIRED"],
+  [{ active: true, detection_categories_enabled: ["MALWARE_DETECTION", "NSFW_IMAGE"] }, "only Malware", "SCANNER_REQUIRED"],
   [{ active: "true", detection_categories_enabled: ["MALWARE"] }, "unexpected format", "SCANNER_UNAVAILABLE"],
   [null, "unexpected format", "SCANNER_UNAVAILABLE"],
 ] as const)(
