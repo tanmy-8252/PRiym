@@ -127,6 +127,7 @@ export default async function Institution() {
                         name: "active",
                         label: "Make active",
                         type: "checkbox",
+                        value: s.active,
                         required: false,
                       },
                     ]}

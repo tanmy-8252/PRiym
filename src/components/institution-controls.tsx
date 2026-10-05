@@ -7,7 +7,7 @@ type Field = {
   name: string;
   label: string;
   type?: string;
-  value?: string | number;
+  value?: string | number | boolean;
   required?: boolean;
   options?: { id: string; name: string }[];
 };
@@ -58,7 +58,9 @@ export function InstitutionForm({
               <select
                 id={`${action}-${id || "new"}-${f.name}`}
                 name={f.name}
-                defaultValue={f.value}
+                defaultValue={
+                  typeof f.value === "boolean" ? undefined : f.value
+                }
               >
                 {f.options.map((o) => (
                   <option key={o.id} value={o.id}>
@@ -71,7 +73,14 @@ export function InstitutionForm({
                 id={`${action}-${id || "new"}-${f.name}`}
                 name={f.name}
                 type={f.type === "iso-date" ? "text" : f.type || "text"}
-                defaultValue={f.type === "checkbox" ? undefined : f.value}
+                defaultValue={
+                  f.type === "checkbox" || typeof f.value === "boolean"
+                    ? undefined
+                    : f.value
+                }
+                defaultChecked={
+                  f.type === "checkbox" ? f.value === true : undefined
+                }
                 placeholder={f.type === "iso-date" ? "YYYY-MM-DD" : undefined}
                 pattern={
                   f.type === "iso-date"
