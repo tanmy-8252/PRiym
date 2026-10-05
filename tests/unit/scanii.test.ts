@@ -105,20 +105,20 @@ it.each([
 });
 
 it.each([
-  { active: false, detection_categories_enabled: ["MALWARE"] },
-  { active: true, detection_categories_enabled: [] },
-  { active: true, detection_categories_enabled: ["NSFW_IMAGE"] },
-  { active: true, detection_categories_enabled: ["MALWARE", "NSFW_IMAGE"] },
-  { active: "true", detection_categories_enabled: ["MALWARE"] },
-  null,
-])(
+  [{ active: false, detection_categories_enabled: ["MALWARE"] }, "inactive", "SCANNER_REQUIRED"],
+  [{ active: true, detection_categories_enabled: [] }, "only Malware", "SCANNER_REQUIRED"],
+  [{ active: true, detection_categories_enabled: ["NSFW_IMAGE"] }, "only Malware", "SCANNER_REQUIRED"],
+  [{ active: true, detection_categories_enabled: ["MALWARE", "NSFW_IMAGE"] }, "only Malware", "SCANNER_REQUIRED"],
+  [{ active: "true", detection_categories_enabled: ["MALWARE"] }, "unexpected format", "SCANNER_UNAVAILABLE"],
+  [null, "unexpected format", "SCANNER_UNAVAILABLE"],
+] as const)(
   "blocks disabled/misconfigured malware detection before sending the file",
-  async (configuredKey) => {
+  async (configuredKey, message, code) => {
     const fetcher = fetchResults({
       balance: 10,
       keys: { [key]: configuredKey },
     });
-    await expect(scan()).rejects.toMatchObject({ code: "SCANNER_REQUIRED" });
+    await expect(scan()).rejects.toMatchObject({ code, message: expect.stringContaining(message) });
     expect(fetcher).toHaveBeenCalledTimes(1);
   },
 );
@@ -127,7 +127,10 @@ it("does not use another key's detection configuration", async () => {
     balance: 10,
     keys: { anotherKey: activeKey },
   });
-  await expect(scan()).rejects.toMatchObject({ code: "SCANNER_REQUIRED" });
+  await expect(scan()).rejects.toMatchObject({
+    code: "SCANNER_REQUIRED",
+    message: expect.stringContaining("does not match a key"),
+  });
   expect(fetcher).toHaveBeenCalledTimes(1);
 });
 it.each([0, -1])(

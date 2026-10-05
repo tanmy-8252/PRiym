@@ -94,15 +94,31 @@ export async function scanWithScanii(bytes: Buffer, mime: string) {
     "SCANNER_UNAVAILABLE",
     "The document scanner could not verify its configuration. Please retry later.",
   );
+  assert(
+    Object.hasOwn(account.data.keys, key),
+    503,
+    "SCANNER_REQUIRED",
+    "The scanner key configured for PRiym does not match a key in the Scanii account. Check the API key and its matching secret in Vercel.",
+  );
   const configuredKey = keySchema.safeParse(account.data.keys[key]);
   assert(
-    configuredKey.success &&
-      configuredKey.data.active &&
-      configuredKey.data.detection_categories_enabled.length === 1 &&
+    configuredKey.success,
+    503,
+    "SCANNER_UNAVAILABLE",
+    "Scanii returned key settings in an unexpected format. Contact an administrator.",
+  );
+  assert(
+    configuredKey.data.active,
+    503,
+    "SCANNER_REQUIRED",
+    "The scanner key configured for PRiym is inactive in Scanii. Activate that exact key and save its settings.",
+  );
+  assert(
+    configuredKey.data.detection_categories_enabled.length === 1 &&
       configuredKey.data.detection_categories_enabled[0] === "MALWARE",
     503,
     "SCANNER_REQUIRED",
-    "An administrator must activate the scanner key with only malware detection enabled.",
+    "The scanner key configured for PRiym must have only Malware detection enabled in Scanii. Save its settings.",
   );
   assert(
     account.data.balance > 0,
