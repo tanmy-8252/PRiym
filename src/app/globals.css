@@ -457,7 +457,8 @@ p {
   flex-direction: column;
   gap: 8px;
 }
-.field label {
+.field label,
+.field-label {
   font-size: 12px;
   font-weight: 600;
 }
@@ -475,6 +476,56 @@ p {
 .field textarea {
   min-height: 110px;
   resize: vertical;
+}
+.collaborator-list {
+  max-height: 220px;
+  overflow-y: auto;
+  border: 1px solid #dbe3db;
+  border-radius: 6px;
+  background: #fff;
+  padding: 6px;
+}
+.collaborator-list > p {
+  margin: 10px;
+}
+.field .collaborator-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-radius: 5px;
+  padding: 9px 10px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 400;
+}
+.field .collaborator-option:hover,
+.field .collaborator-option:focus-within {
+  background: #eef5ec;
+}
+.field .collaborator-option input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  margin: 0;
+  flex: none;
+  accent-color: var(--green);
+}
+.collaborator-empty {
+  margin: 0;
+  padding: 14px 16px;
+  border: 1px solid #dbe3db;
+  border-radius: 6px;
+  background: #f8fbf6;
+}
+.link-button {
+  display: block;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-decoration: underline;
+  padding: 4px 0 0;
+  cursor: pointer;
+  font: inherit;
 }
 .full {
   grid-column: 1 / -1;

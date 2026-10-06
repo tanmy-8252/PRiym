@@ -25,6 +25,7 @@ export default async function Edit({
       departmentId: u.departmentId,
       role: "STUDENT",
       status: "ACTIVE",
+      removedAt: null,
       id: { not: u.id },
     },
     select: { id: true, name: true },

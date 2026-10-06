@@ -39,6 +39,18 @@ export function AchievementForm({
   const [categoryId, setCategoryId] = useState(
     initial?.categoryId || categories[0]?.id || "",
   );
+  const [collaboratorSearch, setCollaboratorSearch] = useState("");
+  const [collaboratorIds, setCollaboratorIds] = useState<string[]>(
+    initial?.collaboratorIds ?? [],
+  );
+  const matchingStudents = students.filter((student) =>
+    student.name
+      .toLocaleLowerCase()
+      .includes(collaboratorSearch.trim().toLocaleLowerCase()),
+  );
+  const unavailableCollaborators = collaboratorIds.filter(
+    (id) => !students.some((student) => student.id === id),
+  );
   const [evidence, setEvidence] = useState<Evidence[]>(initial?.evidence ?? []);
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -160,21 +172,85 @@ export function AchievementForm({
             </label>
           </div>
         )}
-        <div className="field">
-          <label>
-            Collaborators (each submits their own claim)
-            <select
-              name="collaboratorIds"
-              multiple
-              defaultValue={initial?.collaboratorIds || []}
-            >
-              {students.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
-          </label>
+        <div className="field full">
+          <span className="field-label" id="collaborators-label">
+            Collaborators
+          </span>
+          {students.length ? (
+            <>
+              <input
+                type="search"
+                aria-label="Search collaborators"
+                placeholder="Search active students in your department"
+                value={collaboratorSearch}
+                onChange={(event) => setCollaboratorSearch(event.target.value)}
+              />
+              <div
+                className="collaborator-list"
+                role="group"
+                aria-labelledby="collaborators-label"
+              >
+                {matchingStudents.length ? (
+                  matchingStudents.map((student) => {
+                    const selected = collaboratorIds.includes(student.id);
+                    return (
+                      <label className="collaborator-option" key={student.id}>
+                        <input
+                          type="checkbox"
+                          checked={selected}
+                          disabled={!selected && collaboratorIds.length >= 20}
+                          onChange={(event) => {
+                            const checked = event.currentTarget.checked;
+                            setCollaboratorIds((current) =>
+                              checked
+                                ? [...current, student.id]
+                                : current.filter((id) => id !== student.id),
+                            );
+                          }}
+                        />
+                        <span>{student.name}</span>
+                      </label>
+                    );
+                  })
+                ) : (
+                  <p className="small muted">No matching active students.</p>
+                )}
+              </div>
+              <span className="tiny muted">
+                {collaboratorIds.length}/20 selected. Each collaborator submits
+                their own claim.
+              </span>
+            </>
+          ) : (
+            <p className="collaborator-empty small muted">
+              No other active students in your department are available yet.
+              They must verify their email and be approved by an Admin before
+              you can add them.
+            </p>
+          )}
+          {unavailableCollaborators.length > 0 && (
+            <div className="notice warning small">
+              {unavailableCollaborators.length} previously selected
+              collaborator(s) are no longer available. Remove them before
+              saving.
+              <button
+                type="button"
+                className="link-button"
+                onClick={() =>
+                  setCollaboratorIds((current) =>
+                    current.filter(
+                      (id) => !unavailableCollaborators.includes(id),
+                    ),
+                  )
+                }
+              >
+                Remove unavailable
+              </button>
+            </div>
+          )}
+          {collaboratorIds.map((id) => (
+            <input key={id} type="hidden" name="collaboratorIds" value={id} />
+          ))}
         </div>
         <div className="field full">
           <label htmlFor="title">Achievement title *</label>

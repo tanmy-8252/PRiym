@@ -179,6 +179,7 @@ export async function saveSubmission(user: User, raw: unknown, id?: string) {
             id: { in: collaborators },
             role: "STUDENT",
             status: "ACTIVE",
+            removedAt: null,
             departmentId: user.departmentId,
           },
         })) === collaborators.length,
