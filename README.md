@@ -42,7 +42,7 @@ npm run demo:otp
 
 The command reads each exact seeded account's encrypted secret from the same database and environment as Next.js, prints its email/code and remaining validity, and waits for a fresh interval if a code was already used or is about to expire. Codes use SHA-1, 6 digits, a 30-second period and the current interval only; each is single-use per account. Student/Faculty need no code. To print just one account: `npm run demo:otp -- --role hod` (or `admin`). Never paste a previous code after its interval expires.
 
-The role buttons use the configured `DEMO_PASSWORD`, including custom passwords. After changing demo configuration, restart `npm run dev` and run the repair command below. All roles land at `/dashboard`, which renders the role's own dashboard from the database; Faculty can open `/submissions`, HOD `/settings`, and Admin `/admin`.
+Choose Student at `/student/login`, Faculty at `/faculty/login`, or HOD / Admin at `/login`. The `/login` page also offers all three workspace choices. These routes share the same secure authentication and session; the role assigned in the database determines access. The role buttons use the configured `DEMO_PASSWORD`, including custom passwords. After changing demo configuration, restart `npm run dev` and run the repair command below. All roles land at `/dashboard`, which renders the role's own dashboard from the database; Faculty can open `/submissions`, HOD `/settings`, and Admin `/admin`.
 
 To repair an existing local installation (with its database already running):
 
@@ -114,6 +114,8 @@ TEST_DATABASE_URL=postgresql://priym:priym@localhost:5432/priym_test npm run tes
 ```
 
 Browser tests require seeded accounts and a running development database, start/reuse the app, and add synthetic achievements. The scripted browser runner is blocked by this execution environment's macOS process restrictions; run it on an ordinary developer machine or the provided CI. The all-role `test:login` suite uses real HTTP requests, cookies, Auth.js callbacks, database sessions and RBAC dashboards without launching Chromium.
+
+Login submits through one Next.js server action, using the same Auth.js credentials provider. This avoids the extra provider/CSRF/session requests made by the client helper. Sidebar links do not prefetch every workspace page during the first dashboard load, and the activity keep-alive waits until the first 60 seconds of actual use. Role-specific paths work on the existing Vercel project domain. Separate subdomains require a custom domain you control and additional Vercel DNS configuration.
 
 ## Storage and security
 

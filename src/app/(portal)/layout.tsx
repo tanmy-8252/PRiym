@@ -26,7 +26,7 @@ export default async function PortalLayout({
     <div className="shell">
       <InactivityWarning />
       <aside className="sidebar">
-        <Link href="/dashboard">
+        <Link href="/dashboard" prefetch={false}>
           <Logo />
         </Link>
         <p className="brand-caption">Progress. Recognition. Merit.</p>
@@ -71,6 +71,7 @@ export default async function PortalLayout({
             </span>
             <Link
               href="/notifications"
+              prefetch={false}
               className="btn ghost"
               aria-label={`${unread} unread notifications`}
             >

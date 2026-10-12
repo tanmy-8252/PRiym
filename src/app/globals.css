@@ -664,6 +664,26 @@ p {
   width: 100%;
   max-width: 400px;
 }
+.login-roles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 22px;
+}
+.login-roles a {
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 9px 11px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: none;
+}
+.login-roles a[aria-current="page"] {
+  background: #eaf2ea;
+  border-color: #a8c2aa;
+  color: #176a58;
+}
 .login-form form {
   margin-top: 30px;
   display: grid;

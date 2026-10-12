@@ -11,6 +11,23 @@ const paths = {
   HOD: "/settings",
   ADMIN: "/admin",
 };
+test("role login pages expose the correct workspace choice", async ({
+  request,
+}) => {
+  for (const [path, heading] of [
+    ["/login", "Good to see you."],
+    ["/student/login", "Student sign in"],
+    ["/faculty/login", "Faculty sign in"],
+  ]) {
+    const response = await request.get(path);
+    expect(response.status()).toBe(200);
+    const html = await response.text();
+    expect(html).toContain(heading);
+    expect(html).toContain("/student/login");
+    expect(html).toContain("/faculty/login");
+    expect(html).toContain("HOD / Admin");
+  }
+});
 async function login(
   client: APIRequestContext,
   email: string,

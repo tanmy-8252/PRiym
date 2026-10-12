@@ -171,7 +171,7 @@ function useActivity(setWarning: (v: boolean) => void) {
   const router = useRouter();
   useEffect(() => {
     let last = Date.now(),
-      ping = 0;
+      ping = last;
     const activity = () => {
       last = Date.now();
       setWarning(false);

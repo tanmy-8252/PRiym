@@ -62,6 +62,7 @@ export function Nav({ role }: { role: string }) {
             key={l.key}
             className={`nav-link ${path === `/${l.key}` || (l.key === "submissions" && path.startsWith("/submissions/")) ? "active" : ""}`}
             href={`/${l.key}`}
+            prefetch={false}
           >
             <Icon size={17} />
             {l.label}
