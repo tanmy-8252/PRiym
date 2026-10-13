@@ -16,6 +16,7 @@ test("role login pages expose the correct workspace choice", async ({
 }) => {
   for (const [path, heading] of [
     ["/login", "Choose your account category."],
+    ["/login?role=hod&role=admin", "Choose your account category."],
     ["/student/login", "Student sign in"],
     ["/faculty/login", "Faculty sign in"],
   ]) {
