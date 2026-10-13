@@ -1,7 +1,7 @@
 import { pageUser } from "@/server/session";
 import { db } from "@/lib/db";
 import { leaderboard } from "@/server/analytics";
-import { Card, Heading } from "@/components/ui";
+import { Card, Heading, date } from "@/components/ui";
 import { Trophy } from "lucide-react";
 export default async function Leaderboard({
   searchParams,
@@ -14,25 +14,41 @@ export default async function Leaderboard({
     orderBy: { startDate: "desc" },
   });
   const active = semesters.find((s) => s.active);
+  const requestedSemester = semesters.find((s) => s.id === q.semester);
   const semesterId =
-    q.semester === "all" ? undefined : q.semester || active?.id;
-  const cats = await db.category.findMany({
-    where: {
-      active: true,
-      OR: [{ departmentId: u.departmentId }, { departmentId: null }],
-    },
-  });
-  const rows = await leaderboard(u, {
-    semesterId,
-    batch: q.batch ? Number(q.batch) : undefined,
-    categoryId: q.category || undefined,
-  });
+    q.semester === "all" ? undefined : (requestedSemester?.id ?? active?.id);
+  const selectedSemester = semesters.find((s) => s.id === semesterId);
+  const periodLabel = selectedSemester?.label ?? "All time";
+  const periodDates = selectedSemester
+    ? `${date(selectedSemester.startDate)}–${date(selectedSemester.endDate)}`
+    : null;
+  const [cats, rows, totalPoints] = await Promise.all([
+    db.category.findMany({
+      where: {
+        active: true,
+        OR: [{ departmentId: u.departmentId }, { departmentId: null }],
+      },
+    }),
+    leaderboard(u, {
+      semesterId,
+      batch: q.batch ? Number(q.batch) : undefined,
+      categoryId: q.category || undefined,
+    }),
+    u.role === "STUDENT"
+      ? db.pointEntry
+          .aggregate({
+            where: { userId: u.id },
+            _sum: { amount: true },
+          })
+          .then((result) => result._sum.amount ?? 0)
+      : Promise.resolve(null),
+  ]);
   const me = rows.find((r) => r.id === u.id);
   return (
     <>
       <Heading
         title="Effort worth celebrating."
-        description="Recognition earned through verified achievements. Keep moving forward."
+        description={`Showing ${periodLabel}${periodDates ? ` (${periodDates})` : ""} rankings from verified achievements. Change the semester filter to compare periods.`}
       />
       <Card>
         <form className="filters">
@@ -40,12 +56,13 @@ export default async function Leaderboard({
             name="semester"
             aria-label="Leaderboard semester"
             className="filter-input"
-            defaultValue={q.semester ?? active?.id}
+            defaultValue={semesterId ?? "all"}
           >
             <option value="all">All time</option>
             {semesters.map((s) => (
               <option key={s.id} value={s.id}>
-                {s.label}
+                {s.label} · {date(s.startDate)}–{date(s.endDate)}
+                {s.active ? " · Active" : ""}
               </option>
             ))}
           </select>
@@ -87,7 +104,7 @@ export default async function Leaderboard({
                 <th>Student</th>
                 <th>Batch</th>
                 <th>Badges</th>
-                <th>Verified points</th>
+                <th>Verified points · {periodLabel}</th>
               </tr>
             </thead>
             <tbody>
@@ -123,7 +140,19 @@ export default async function Leaderboard({
         </div>
         {me && (
           <div className="notice small">
-            Your position: #{me.rank} · {me.points} verified points
+            Your position in {periodLabel}
+            {periodDates ? ` (${periodDates})` : ""}: #{me.rank} · {me.points}{" "}
+            verified points
+            {totalPoints !== null ? ` · ${totalPoints} all-time points` : ""}
+            {selectedSemester &&
+              totalPoints !== null &&
+              totalPoints > me.points &&
+              !q.category && (
+                <p style={{ marginTop: 6 }}>
+                  Your earlier achievements remain in your all-time total.
+                  Select “All time” to see them in the rankings.
+                </p>
+              )}
           </div>
         )}
         <p className="tiny muted" style={{ marginTop: 20 }}>

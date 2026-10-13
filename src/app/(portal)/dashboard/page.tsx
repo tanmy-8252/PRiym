@@ -23,24 +23,29 @@ import {
 } from "@/components/ui";
 export default async function Dashboard() {
   const u = await pageUser();
-  const d = await dashboardData(u);
-  const semester = await db.semester.findFirst({ where: { active: true } });
-  const notifications = await db.notification.findMany({
-    where: { userId: u.id },
-    orderBy: { createdAt: "desc" },
-    take: 5,
-  });
+  const [d, semester, notifications] = await Promise.all([
+    dashboardData(u),
+    db.semester.findFirst({ where: { active: true } }),
+    db.notification.findMany({
+      where: { userId: u.id },
+      orderBy: { createdAt: "desc" },
+      take: 5,
+    }),
+  ]);
   if (u.role === "STUDENT") {
-    const badges = await db.userBadge.findMany({
-      where: { userId: u.id, revokedAt: null },
-      include: { badge: true },
-    });
-    const ranks = await leaderboard(u, { semesterId: semester?.id });
+    const [badges, ranks, semesterPoints] = await Promise.all([
+      db.userBadge.findMany({
+        where: { userId: u.id, revokedAt: null },
+        include: { badge: true },
+      }),
+      leaderboard(u, { semesterId: semester?.id }),
+      db.pointEntry.aggregate({
+        where: { userId: u.id, semesterId: semester?.id },
+        _sum: { amount: true },
+      }),
+    ]);
     const me = ranks.find((r) => r.id === u.id);
-    const semesterPoints = await db.pointEntry.aggregate({
-      where: { userId: u.id, semesterId: semester?.id },
-      _sum: { amount: true },
-    });
+    const currentPoints = semesterPoints._sum.amount ?? 0;
     return (
       <>
         <Heading
@@ -62,7 +67,7 @@ export default async function Dashboard() {
             </p>
             <Link
               className="small"
-              href="/leaderboard"
+              href="/leaderboard?semester=all"
               style={{
                 display: "inline-flex",
                 gap: 6,
@@ -93,8 +98,8 @@ export default async function Dashboard() {
         <div className="stats">
           <Stat
             title="This semester"
-            value={semesterPoints._sum.amount ?? 0}
-            detail="Points from verified achievements"
+            value={currentPoints}
+            detail={`${semester?.label ?? "Current semester"} · verified points`}
             icon={<Sparkles size={18} />}
           />
           <Stat
@@ -112,10 +117,19 @@ export default async function Dashboard() {
           <Stat
             title="Department rank"
             value={me ? `#${me.rank}` : "—"}
-            detail="Current semester · CSE leaderboard"
+            detail={`${semester?.label ?? "All time"} · ${u.department.code} leaderboard`}
             icon={<Trophy size={18} />}
           />
         </div>
+        {semester && d.points > currentPoints && (
+          <div className="notice small" style={{ marginBottom: 24 }}>
+            Your {d.points} total verified points include achievements from
+            other semesters. The {semester.label} leaderboard counts{" "}
+            {currentPoints} points.{" "}
+            <Link href="/leaderboard?semester=all">View all-time rankings</Link>
+            .
+          </div>
+        )}
         <div className="columns">
           <Card
             title="Recent achievements"
