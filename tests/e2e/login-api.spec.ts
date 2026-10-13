@@ -15,7 +15,7 @@ test("role login pages expose the correct workspace choice", async ({
   request,
 }) => {
   for (const [path, heading] of [
-    ["/login", "Good to see you."],
+    ["/login", "Choose your account category."],
     ["/student/login", "Student sign in"],
     ["/faculty/login", "Faculty sign in"],
   ]) {
@@ -25,7 +25,8 @@ test("role login pages expose the correct workspace choice", async ({
     expect(html).toContain(heading);
     expect(html).toContain("/student/login");
     expect(html).toContain("/faculty/login");
-    expect(html).toContain("HOD / Admin");
+    expect(html).toContain("/login?role=hod");
+    expect(html).toContain("/login?role=admin");
   }
 });
 async function login(
@@ -57,10 +58,15 @@ for (const account of demoAccounts) {
       extraHTTPHeaders: { Origin: baseURL },
     });
     try {
-      const page = await client.get("/login");
+      const loginPage =
+        account.role === "STUDENT"
+          ? "/student/login"
+          : account.role === "FACULTY"
+            ? "/faculty/login"
+            : `/login?role=${account.role.toLowerCase()}`;
+      const page = await client.get(loginPage);
       const html = await page.text();
-      for (const a of demoAccounts)
-        expect(html).toContain(`>${a.label}</button>`);
+      expect(html).toContain(`>${account.label}</button>`);
       expect(html).toContain(password);
       const otp = ["HOD", "ADMIN"].includes(account.role)
         ? demoOtp(account.role)

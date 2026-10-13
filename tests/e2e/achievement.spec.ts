@@ -4,7 +4,7 @@ import { PDFDocument } from "pdf-lib";
 import { demoOtp } from "./demo-otp";
 import { mkdir } from "node:fs/promises";
 async function login(page: Page, role: string) {
-  await page.goto("/login");
+  await page.goto(`/${role}/login`);
   await page.getByLabel("Institutional email").fill(`${role}@atria.edu`);
   await page
     .getByLabel("Password", { exact: true })

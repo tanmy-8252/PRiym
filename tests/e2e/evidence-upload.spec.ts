@@ -10,7 +10,7 @@ async function pdf(name: string) {
   };
 }
 test.beforeEach(async ({ page }) => {
-  await page.goto("/login");
+  await page.goto("/student/login");
   await page.getByLabel("Institutional email").fill("student@atria.edu");
   await page
     .getByLabel("Password", { exact: true })

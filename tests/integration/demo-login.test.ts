@@ -116,6 +116,14 @@ describe("clean local demo accounts", () => {
         ).toBeNull();
     }
   });
+  it("rejects a selected account category that does not match the user's role", async () => {
+    await resetDemoAccounts();
+    const email = demoAccounts[0].email;
+    expect(await authenticate({ email, password, role: "FACULTY" })).toBeNull();
+    expect(
+      await authenticate({ email, password, role: "STUDENT" }),
+    ).not.toBeNull();
+  });
   it("retains ordinary lockout and account approval protections", async () => {
     await resetDemoAccounts();
     const email = "student@atria.edu";

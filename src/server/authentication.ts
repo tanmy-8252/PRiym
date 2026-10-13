@@ -6,6 +6,7 @@ import { audit } from "./audit";
 import { tokenDigest } from "./account";
 import { z } from "zod";
 const credentialsSchema = z.object({
+  role: z.enum(["STUDENT", "FACULTY", "HOD", "ADMIN"]).optional(),
   email: z.email().toLowerCase(),
   password: z.string().min(1).max(72),
   otp: z.string().default(""),
@@ -34,6 +35,7 @@ export async function authenticate(raw: unknown, request?: Request) {
         (user.lockedUntil && user.lockedUntil > new Date())
       )
         return null;
+      if (c.role && c.role !== user.role) return null;
       let valid = await compare(c.password, user.passwordHash);
       const mfaRequired =
         ["HOD", "ADMIN"].includes(user.role) || !!user.mfaSecret;

@@ -9,9 +9,14 @@ export async function loginAction(
   _previous: LoginState,
   formData: FormData,
 ): Promise<LoginState> {
+  const role = formData.get("role")?.toString();
+  if (!role || !["STUDENT", "FACULTY", "HOD", "ADMIN"].includes(role)) {
+    return { error: "Select an account category to sign in." };
+  }
   let destination: string;
   try {
     destination = await signIn("credentials", {
+      role,
       email: formData.get("email")?.toString() ?? "",
       password: formData.get("password")?.toString() ?? "",
       otp: formData.get("otp")?.toString() ?? "",
@@ -25,8 +30,9 @@ export async function loginAction(
 
   if (new URL(destination, process.env.AUTH_URL).searchParams.has("error")) {
     return {
-      error:
-        "Unable to sign in. Check your credentials and MFA code, account approval, or wait 30 minutes if locked.",
+      error: ["HOD", "ADMIN"].includes(role)
+        ? "Unable to sign in. Check your credentials and authenticator code, account approval, or wait 30 minutes if locked."
+        : "Unable to sign in. Check your credentials, account approval, or wait 30 minutes if locked. If you enabled an authenticator, enter its code.",
     };
   }
   redirect("/dashboard");

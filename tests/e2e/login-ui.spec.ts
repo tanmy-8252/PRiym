@@ -12,9 +12,22 @@ test.use({
 const loginPath = {
   STUDENT: "/student/login",
   FACULTY: "/faculty/login",
-  HOD: "/login",
-  ADMIN: "/login",
+  HOD: "/login?role=hod",
+  ADMIN: "/login?role=admin",
 };
+
+test("requires an account category before showing credential fields", async ({
+  page,
+}) => {
+  await page.goto("/login");
+  await expect(page.getByLabel("Institutional email")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Sign in →" })).toHaveCount(0);
+  await page.getByRole("link", { name: "Student", exact: true }).click();
+  await expect(page.getByLabel("Institutional email")).toBeVisible();
+  await expect(page.getByLabel("Authenticator code")).toHaveCount(0);
+  await page.getByRole("button", { name: "I use an authenticator" }).click();
+  await expect(page.getByLabel("Authenticator code")).toBeVisible();
+});
 
 for (const account of demoAccounts) {
   test(`${account.label} signs in through the role page with one action request`, async ({
@@ -33,6 +46,11 @@ for (const account of demoAccounts) {
     });
 
     await page.goto(path);
+    if (account.role === "STUDENT" || account.role === "FACULTY") {
+      await expect(page.getByLabel("Authenticator code")).toHaveCount(0);
+    } else {
+      await expect(page.getByLabel("Authenticator code")).toBeVisible();
+    }
     await page
       .getByRole("button", { name: account.label, exact: true })
       .click();
@@ -55,7 +73,10 @@ for (const account of demoAccounts) {
         .first(),
     ).toBeVisible();
     expect(
-      loginRequests.filter((request) => request === `POST ${path}`),
+      loginRequests.filter(
+        (request) =>
+          request === `POST ${new URL(path, "http://localhost").pathname}`,
+      ),
     ).toHaveLength(1);
     expect(
       loginRequests.some((request) => request.startsWith("GET /api/auth/")),

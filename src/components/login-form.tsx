@@ -9,16 +9,19 @@ export function LoginForm({
   audience,
 }: {
   demoPassword?: string;
-  audience?: LoginAudience;
+  audience: LoginAudience;
 }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [otp, setOtp] = useState("");
+  const [showOptionalMfa, setShowOptionalMfa] = useState(false);
   const [errorDismissed, setErrorDismissed] = useState(false);
   const [state, formAction, busy] = useActionState(loginAction, { error: "" });
+  const requiredMfa = audience === "HOD" || audience === "ADMIN";
   return (
     <>
       <form action={formAction} onSubmit={() => setErrorDismissed(false)}>
+        <input type="hidden" name="role" value={audience} />
         <div className="field">
           <label htmlFor="email">Institutional email</label>
           <input
@@ -49,25 +52,41 @@ export function LoginForm({
             }}
           />
         </div>
-        <div className="field">
-          <label htmlFor="otp">
-            Authenticator code{" "}
-            <span className="muted">(HOD / Admin, or if enabled)</span>
-          </label>
-          <input
-            id="otp"
-            name="otp"
-            inputMode="text"
-            autoComplete="one-time-code"
-            placeholder="6-digit code or recovery code"
-            value={otp}
-            maxLength={32}
-            onChange={(e) => {
-              setOtp(e.target.value);
+        {(requiredMfa || showOptionalMfa) && (
+          <div className="field">
+            <label htmlFor="otp">Authenticator code</label>
+            <input
+              id="otp"
+              name="otp"
+              inputMode="text"
+              autoComplete="one-time-code"
+              placeholder="6-digit code or recovery code"
+              required={requiredMfa}
+              value={otp}
+              maxLength={32}
+              onChange={(e) => {
+                setOtp(e.target.value);
+                setErrorDismissed(true);
+              }}
+            />
+          </div>
+        )}
+        {!requiredMfa && (
+          <button
+            type="button"
+            className="login-mfa-toggle"
+            aria-expanded={showOptionalMfa}
+            onClick={() => {
+              setShowOptionalMfa(!showOptionalMfa);
+              setOtp("");
               setErrorDismissed(true);
             }}
-          />
-        </div>
+          >
+            {showOptionalMfa
+              ? "Hide authenticator code"
+              : "I use an authenticator"}
+          </button>
+        )}
         <label className="check small">
           <input type="checkbox" name="remember" /> Remember me for 30 days
         </label>
@@ -98,13 +117,7 @@ export function LoginForm({
           <strong className="small">Local demo accounts</strong>
           <div className="login-demo">
             {demoAccounts
-              .filter(
-                (account) =>
-                  !audience ||
-                  (audience === "STAFF"
-                    ? account.role === "HOD" || account.role === "ADMIN"
-                    : account.role === audience),
-              )
+              .filter((account) => account.role === audience)
               .map((account) => (
                 <button
                   key={account.role}
@@ -121,7 +134,11 @@ export function LoginForm({
               ))}
           </div>
           <p className="tiny" style={{ marginTop: 10 }}>
-            HOD and Admin require a code from <code>npm run demo:otp</code>.
+            {requiredMfa && (
+              <>
+                Get the current code with <code>npm run demo:otp</code>.{" "}
+              </>
+            )}
             Demo documents are synthetic.
           </p>
         </div>

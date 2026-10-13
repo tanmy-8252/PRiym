@@ -9,7 +9,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   session: { strategy: "jwt", maxAge: 30 * 24 * 3600 },
   providers: [
     Credentials({
-      credentials: { email: {}, password: {}, otp: {}, remember: {} },
+      credentials: { role: {}, email: {}, password: {}, otp: {}, remember: {} },
       authorize: (credentials, request) =>
         requestContext.run(contextFromRequest(request), () =>
           authenticate(credentials, request),
