@@ -5,6 +5,13 @@ import { createClient } from "@supabase/supabase-js";
 import { assert } from "@/lib/errors";
 import { MAX_FILE_BYTES, fileValidationError } from "@/lib/evidence-files";
 import { requireScanner, scanEvidence } from "./malware";
+import {
+  deleteCloudinaryEvidence,
+  downloadCloudinaryEvidence,
+  isCloudinaryEvidenceKey,
+  requireCloudinaryEvidenceConfig,
+  uploadCloudinaryEvidence,
+} from "./cloudinary-evidence";
 export { MAX_FILE_BYTES } from "@/lib/evidence-files";
 export function validateFile(bytes: Buffer, mime: string, name: string) {
   const error = fileValidationError(name, mime, bytes.length);
@@ -67,6 +74,14 @@ export async function requireUploadStorage() {
     "Evidence uploads are unavailable until an administrator connects private file storage.",
   );
   if (provider === "supabase") {
+    const archiveProvider = process.env.EVIDENCE_ARCHIVE_PROVIDER || "supabase";
+    assert(
+      ["supabase", "cloudinary"].includes(archiveProvider),
+      503,
+      "STORAGE_CONFIG",
+      "Evidence archive storage is not configured.",
+    );
+    if (archiveProvider === "cloudinary") requireCloudinaryEvidenceConfig();
     const { data, error } = await supabaseClient().getBucket(
       process.env.SUPABASE_STORAGE_BUCKET || "priym-evidence",
     );
@@ -114,6 +129,10 @@ export async function stagedEvidence(key: string) {
   return Buffer.from(await data.arrayBuffer());
 }
 export async function discardEvidence(key: string) {
+  if (isCloudinaryEvidenceKey(key)) {
+    await deleteCloudinaryEvidence(key);
+    return;
+  }
   if (process.env.STORAGE_PROVIDER === "supabase") {
     const { error } = await supabase().remove([key]);
     if (error) throw new Error("Could not remove temporary evidence.");
@@ -143,13 +162,18 @@ export async function storeEvidence(
   validateFile(bytes, mime, fileName);
   await requireUploadStorage();
   const scanStatus = await scanEvidence(bytes, mime, fileName);
-  const storageKey = `${ownerId}/${randomUUID()}`;
+  let storageKey = `${ownerId}/${randomUUID()}`;
   if (process.env.STORAGE_PROVIDER === "supabase") {
-    const { error } = await supabase().upload(storageKey, bytes, {
-      contentType: mime,
-      upsert: false,
-    });
-    assert(!error, 503, "STORAGE_FAILED", "Upload failed. Try again later.");
+    if (process.env.EVIDENCE_ARCHIVE_PROVIDER === "cloudinary") {
+      const stored = await uploadCloudinaryEvidence(ownerId, bytes);
+      storageKey = stored.storageKey;
+    } else {
+      const { error } = await supabase().upload(storageKey, bytes, {
+        contentType: mime,
+        upsert: false,
+      });
+      assert(!error, 503, "STORAGE_FAILED", "Upload failed. Try again later.");
+    }
   } else {
     const target = localPath(storageKey);
     await mkdir(path.dirname(target), { recursive: true });
@@ -167,7 +191,25 @@ export async function storeEvidence(
       .slice(0, 200),
   };
 }
-export async function retrieveEvidence(key: string) {
+export async function retrieveEvidence(
+  key: string,
+  expected?: { sizeBytes: number; sha256: string },
+) {
+  if (isCloudinaryEvidenceKey(key)) {
+    assert(
+      expected,
+      503,
+      "STORAGE_CONFIG",
+      "Evidence integrity metadata is missing.",
+    );
+    return {
+      bytes: await downloadCloudinaryEvidence(
+        key,
+        expected.sizeBytes,
+        expected.sha256,
+      ),
+    };
+  }
   if (process.env.STORAGE_PROVIDER === "supabase") {
     const { data, error } = await supabase().createSignedUrl(key, 60);
     assert(

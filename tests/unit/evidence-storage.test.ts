@@ -43,3 +43,13 @@ it("accepts a private bucket with a storage-enforced 10 MB limit", async () => {
   });
   await expect(requireUploadStorage()).resolves.toBeUndefined();
 });
+it("requires Cloudinary server credentials before enabling the optional archive", async () => {
+  setup();
+  vi.stubEnv("EVIDENCE_ARCHIVE_PROVIDER", "cloudinary");
+  vi.stubEnv("CLOUDINARY_CLOUD_NAME", "");
+  vi.stubEnv("CLOUDINARY_API_KEY", "");
+  vi.stubEnv("CLOUDINARY_API_SECRET", "");
+  await expect(requireUploadStorage()).rejects.toMatchObject({
+    code: "STORAGE_CONFIG",
+  });
+});

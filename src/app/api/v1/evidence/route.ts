@@ -1,6 +1,6 @@
 import { api } from "@/server/http";
 import { requireUser } from "@/server/session";
-import { MAX_FILE_BYTES, storeEvidence } from "@/server/storage";
+import { MAX_FILE_BYTES, discardEvidence, storeEvidence } from "@/server/storage";
 import { assert } from "@/lib/errors";
 import { db } from "@/lib/db";
 import { audit } from "@/server/audit";
@@ -55,20 +55,27 @@ export async function POST(r: Request) {
       evidenceMimeType(name, r.headers.get("content-type") || ""),
       name,
     );
-    const evidence = await db.$transaction(async (tx) => {
-      const e = await tx.evidence.create({
-        data: { ownerId: u.id, ...stored },
+    try {
+      const evidence = await db.$transaction(async (tx) => {
+        const e = await tx.evidence.create({
+          data: { ownerId: u.id, ...stored },
+        });
+        await audit(tx, u, "EVIDENCE_UPLOADED", "Evidence", e.id, {
+          fileName: e.fileName,
+          sha256: e.sha256,
+        });
+        return e;
       });
-      await audit(tx, u, "EVIDENCE_UPLOADED", "Evidence", e.id, {
-        fileName: e.fileName,
-        sha256: e.sha256,
-      });
-      return e;
-    });
-    return {
-      id: evidence.id,
-      fileName: evidence.fileName,
-      sizeBytes: evidence.sizeBytes,
-    };
+      return {
+        id: evidence.id,
+        fileName: evidence.fileName,
+        sizeBytes: evidence.sizeBytes,
+      };
+    } catch (error) {
+      await discardEvidence(stored.storageKey).catch(() =>
+        console.error("PRiym evidence cleanup needs retry"),
+      );
+      throw error;
+    }
   });
 }
