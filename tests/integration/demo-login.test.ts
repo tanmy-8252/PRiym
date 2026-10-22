@@ -5,7 +5,7 @@ import { resetDemoAccounts } from "@/server/demo-accounts";
 import { authenticate } from "@/server/authentication";
 import { demoAccounts } from "@/lib/demo";
 import { decrypt } from "@/lib/crypto";
-import { generateTotp, totpStep } from "@/lib/totp";
+import { generateTotp, TOTP_PERIOD_MS, totpStep } from "@/lib/totp";
 const password = "CustomDemo9!",
   secret = "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ";
 beforeAll(() => {
@@ -89,31 +89,39 @@ describe("clean local demo accounts", () => {
   });
   it("authenticates all four roles with the configured password and exact seeded MFA; rejects replay and missing codes", async () => {
     await resetDemoAccounts();
-    for (const account of demoAccounts) {
-      const mfa = ["HOD", "ADMIN"].includes(account.role);
-      if (mfa)
+    // Keep the test in one TOTP interval even if CI crosses a real 30-second boundary.
+    const now = Date.now();
+    const epoch = Math.floor(now / TOTP_PERIOD_MS) * TOTP_PERIOD_MS + 15_000;
+    const clock = vi.spyOn(Date, "now").mockReturnValue(epoch);
+    try {
+      for (const account of demoAccounts) {
+        const mfa = ["HOD", "ADMIN"].includes(account.role);
+        if (mfa)
+          expect(
+            await authenticate({ email: account.email, password }),
+          ).toBeNull();
+        const otp = mfa ? generateTotp(secret) : "";
+        const result = await authenticate({
+          email: account.email,
+          password,
+          otp,
+        });
+        expect(result?.id).toBeTruthy();
+        expect(result?.sessionId).toBeTruthy();
         expect(
-          await authenticate({ email: account.email, password }),
-        ).toBeNull();
-      const otp = mfa ? generateTotp(secret) : "";
-      const result = await authenticate({
-        email: account.email,
-        password,
-        otp,
-      });
-      expect(result?.id).toBeTruthy();
-      expect(result?.sessionId).toBeTruthy();
-      expect(
-        (
-          await db.authSession.findUniqueOrThrow({
-            where: { id: result!.sessionId },
-          })
-        ).userId,
-      ).toBe(result!.id);
-      if (mfa)
-        expect(
-          await authenticate({ email: account.email, password, otp }),
-        ).toBeNull();
+          (
+            await db.authSession.findUniqueOrThrow({
+              where: { id: result!.sessionId },
+            })
+          ).userId,
+        ).toBe(result!.id);
+        if (mfa)
+          expect(
+            await authenticate({ email: account.email, password, otp }),
+          ).toBeNull();
+      }
+    } finally {
+      clock.mockRestore();
     }
   });
   it("rejects a selected account category that does not match the user's role", async () => {
